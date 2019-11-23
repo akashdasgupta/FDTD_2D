@@ -7,15 +7,17 @@ class Point
 {
 private:
     double m_Ez{0};
+    double m_Dz{0};
     double m_Hx{0};
     double m_Hy{0};
 
 
 public:
     Point();
-    Point(double setter[3]);
+    Point(double setter[4]);
     
     void SetEz(double value);
+    void SetDz(double value);
     void SetHx(double value);
     void SetHy(double value);
 
@@ -23,6 +25,7 @@ public:
     friend std::ostream& operator<< (std::ostream &out, const Point &point);
     
     double GetEz(){return m_Ez;}
+    double GetDz(){return m_Dz;}
     double GetHx(){return m_Hx;}
     double GetHy(){return m_Hy;}
 
