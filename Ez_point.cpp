@@ -1,6 +1,6 @@
 #include "Ez_point.h"
 
-std::ostream& operator<< (std::ostream &out, const YeePoint &point)
+std::ostream& operator<< (std::ostream &out, const Point &point)
 {
     out << point.m_Ez << "," 
         << point.m_Hx << "," 
@@ -8,9 +8,9 @@ std::ostream& operator<< (std::ostream &out, const YeePoint &point)
     return out;
 }
 
-YeePoint operator+ (YeePoint point1, YeePoint point2)
+Point operator+ (Point point1, Point point2)
 {
-    YeePoint new_point;
+    Point new_point;
     
     new_point.SetEz(point1.GetEz() + point2.GetEz());
     new_point.SetHx(point1.GetHx() + point2.GetHx());
@@ -20,8 +20,8 @@ YeePoint operator+ (YeePoint point1, YeePoint point2)
 }
 
 // Setters:
-YeePoint::YeePoint(){}
-YeePoint::YeePoint(double setter[3])
+Point::Point(){}
+Point::Point(double setter[3])
 {
     m_Ez = setter[0];
     m_Hx = setter[1];
@@ -29,7 +29,7 @@ YeePoint::YeePoint(double setter[3])
 }
 
 
-void YeePoint::SetEz(double value){m_Ez=value;}
-void YeePoint::SetHx(double value){m_Hx=value;}
-void YeePoint::SetHy(double value){m_Hy=value;}
+void Point::SetEz(double value){m_Ez=value;}
+void Point::SetHx(double value){m_Hx=value;}
+void Point::SetHy(double value){m_Hy=value;}
 

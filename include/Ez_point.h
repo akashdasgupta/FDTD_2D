@@ -3,7 +3,7 @@
 #include <iostream>
 
 
-class YeePoint
+class Point
 {
 private:
     double m_Ez{0};
@@ -12,15 +12,15 @@ private:
 
 
 public:
-    YeePoint();
-    YeePoint(double setter[3]);
+    Point();
+    Point(double setter[3]);
     
     void SetEz(double value);
     void SetHx(double value);
     void SetHy(double value);
 
     
-    friend std::ostream& operator<< (std::ostream &out, const YeePoint &point);
+    friend std::ostream& operator<< (std::ostream &out, const Point &point);
     
     double GetEz(){return m_Ez;}
     double GetHx(){return m_Hx;}
@@ -28,5 +28,5 @@ public:
 
 };
 
-YeePoint operator+ (YeePoint point1, YeePoint point2); 
+Point operator+ (Point point1, Point point2); 
 #endif

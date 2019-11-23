@@ -8,8 +8,8 @@ NAME = a.out
 
 
 $(NAME): $(SRC)
-	$(CC) -o $(NAME) $(CFLAGS) $(SRC)
+	@$(CC) -o $(NAME) $(CFLAGS) $(SRC)
 
 .PHONY: clean
 clean:
-	rm -f $(NAME)
+	@rm -f $(NAME)
