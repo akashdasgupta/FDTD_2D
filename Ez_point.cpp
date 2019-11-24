@@ -37,3 +37,8 @@ void Point::SetDz(double value){m_Dz=value;}
 void Point::SetHx(double value){m_Hx=value;}
 void Point::SetHy(double value){m_Hy=value;}
 
+void Point::InjectEz(double value){m_Ez+=value;}
+void Point::InjectDz(double value){m_Dz+=value;}
+void Point::InjectHx(double value){m_Hx+=value;}
+void Point::InjectHy(double value){m_Hy+=value;}
+

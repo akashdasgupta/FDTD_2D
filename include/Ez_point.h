@@ -21,6 +21,10 @@ public:
     void SetHx(double value);
     void SetHy(double value);
 
+    void InjectEz(double value);
+    void InjectDz(double value);
+    void InjectHx(double value);
+    void InjectHy(double value);
     
     friend std::ostream& operator<< (std::ostream &out, const Point &point);
     

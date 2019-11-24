@@ -1,7 +1,7 @@
 CC = g++
 IDIR = include
 
-CFLAGS = -I $(IDIR)
+CFLAGS = -I $(IDIR) -O3
 
 SRC = $(wildcard *.cpp)
 NAME = a.out
@@ -12,4 +12,4 @@ $(NAME): $(SRC)
 
 .PHONY: clean
 clean:
-	@rm -f $(NAME)
+	@rm -f $(NAME) data/*
