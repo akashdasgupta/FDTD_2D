@@ -52,9 +52,9 @@ for filename in files:
 #        count = 0
 #    else:
 #        count += 1
-    ims.append([plt.imshow(imageEz, cmap='inferno')])
+    ims.append([plt.imshow((imageEz)**2, cmap='inferno', vmin=0, vmax=1)])
 
-ani = animation.ArtistAnimation(fig,ims)
-#ani.save('dynamic_images.mp4')
+ani = animation.ArtistAnimation(fig,ims, interval=33)
+ani.save('dynamic_images.mp4')
 plt.show()
 

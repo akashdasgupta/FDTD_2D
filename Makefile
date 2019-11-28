@@ -1,4 +1,4 @@
-CC = g++
+CC = mpic++
 IDIR = include
 
 CFLAGS = -I $(IDIR) -O3
