@@ -10,51 +10,74 @@ import csv
 from matplotlib import pyplot as plt
 import matplotlib.animation as animation
 
-import matplotlib
-matplotlib.use("Qt5Agg")
+#import matplotlib
+#matplotlib.use("Qt5Agg")
+
+def index(i,j,t, Nx, Ny):
+    return((Nx*Ny*(t)) + (i*Nx) + j)
 
 Nx = 100
 Ny = 100
+num_ranks = 5
+iterations = 1000
 
+filenames = ['0TOP.txt']
+for i in np.arange(1,num_ranks,1):
+    filenames.append(str(i)+'.txt') 
+filenames.append('0BOTTOM.txt')
+
+
+ny_sizes = []
+base_ny = int(Ny / num_ranks)
+ny_remainder = Ny % num_ranks
+
+ny_sizes.append(int(base_ny/2))
+
+for i in np.arange(1,num_ranks,1):
+    if i <= ny_remainder:
+        ny_sizes.append(base_ny+1)
+    else:
+        ny_sizes.append(base_ny)
+
+ny_sizes.append(base_ny - int(base_ny/2))
+
+        
+        
+        
+        
 filepath= r'/home/akash/4th_year_computing/FDTD_2D/data'
-files = [filepath + '/' + str(i+1) for i in range(1000)]
+data = {}
+
+for filename in filenames:
+    holder = []
+    path = filepath + '/' + filename
+    
+    with open(path,'r') as file:
+        reader=csv.reader(file)
+        for row in reader:
+            holder.append(row)
+    data[filename] = holder
+
+
+image = np.zeros((Nx,Ny))
 
 ims = []
 fig = plt.figure()
 
-count=0
 
-for filename in files:
-    holderez=[]
-    holderhx = []
-    holderhy = []
-
-    with open(filename + '.txt','r') as file:
-        reader=csv.reader(file)
-        for row in reader:
-            holderez.append(float(row[0]))
-            holderhx.append(float(row[2]))
-            holderhy.append(float(row[3]))
-    
-    
-    imageEz = np.zeros((Ny, Nx))
-    imageHx = np.zeros((Ny, Nx))
-    imageHy = np.zeros((Ny, Nx))
-
-    for i in range(Ny):
-        for j in range(Nx):
-            index = (i * Nx) + j
-            imageEz[i,j] = holderez[index]
-            imageHx[i,j] = holderhx[index]
-            imageHy[i,j] = holderhy[index]
-#    if count ==10:
-#        ims.append([plt.imshow(imageEz, cmap='inferno')])
-#        count = 0
-#    else:
-#        count += 1
-    ims.append([plt.imshow((imageEz)**2, cmap='inferno', vmin=0, vmax=1)])
+for t in np.arange(0,200,1):
+    global_i = 0
+    for filename, local_ny in zip(filenames, ny_sizes):
+        for i in range(local_ny):
+            for j in range(Nx):
+                E = data[filename][index(i,j,t,Nx,local_ny)][0]
+                image[global_i, j] = E
+            global_i += 1
+    ims.append([plt.imshow((image)**2, cmap='inferno')]) 
+    plt.show()               
 
 ani = animation.ArtistAnimation(fig,ims, interval=33)
 ani.save('dynamic_images.mp4')
 plt.show()
+
 
