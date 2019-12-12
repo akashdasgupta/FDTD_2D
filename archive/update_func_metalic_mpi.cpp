@@ -25,7 +25,7 @@ void update_H_master(Point space[], int Nx, int Ny, double mux[], double muy[], 
             space[index(i,j,Nx)].SetHy(new_Hy);
             
         }
-        int j{Ny-1};
+        int j{Nx-1};
         CEx = (space[index(i+1,j,Nx)].GetEz() - space[index(i,j,Nx)].GetEz()) / dy;
         CEy = (0 - space[index(i,j,Nx)].GetEz()) / dx;
         
@@ -130,7 +130,7 @@ void update_H_worker(Point space[], int Nx, int Ny, double mux[], double muy[], 
             space[index(i,j,Nx)].SetHy(new_Hy);
             
         }
-        int j{Ny-1};
+        int j{Nx-1};
         CEx = (space[index(i+1,j,Nx)].GetEz() - space[index(i,j,Nx)].GetEz()) / dy;
         CEy = (0 - space[index(i,j,Nx)].GetEz()) / dx;
         
