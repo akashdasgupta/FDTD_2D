@@ -21,7 +21,7 @@ def index(i,j,t, Nx, Ny):
 Nx = 100
 Ny = 100
 num_ranks = 4
-iterations = 590
+iterations = 100
 
 filenames = ['0TOP.txt']
 for i in np.arange(1,num_ranks,1):
@@ -75,11 +75,11 @@ for t in np.arange(0,iterations,1):
                 E = data[filename][index(i,j,t,Nx,local_ny)][3]
                 image[global_i, j] = E
             global_i += 1
-    ims.append([plt.imshow(image**2, cmap='inferno', vmin=0, vmax=0.01)]) 
-    plt.show()               
+    # ims.append([plt.imshow(image**2, cmap='inferno', vmin=0, vmax=0.01)]) 
+    # plt.show()               
 
-ani = animation.ArtistAnimation(fig,ims, interval=33)
-ani.save('dynamic_images.mp4')
-plt.show()
+# ani = animation.ArtistAnimation(fig,ims, interval=33)
+# ani.save('dynamic_images.mp4')
+# plt.show()
 
 print(time.time() - start_time)

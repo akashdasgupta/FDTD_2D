@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
         
         for (int i=0; i<pml_size_x; ++i)
         {
-             std::cout << DzX_coefs[i] << '\n' << "Sigma_x:  " <<sigma_x[i] << '\n';
+             std::cout << sigma_x[i] << '\n';
         }
         
         
@@ -93,13 +93,27 @@ int main(int argc, char *argv[])
         double *muy = new double[local_Ny*Nx];
 
 
-        for (int j=0; j<Nx; ++j)
+        for (int i=0; i<local_Ny; ++i)
         {
-            for (int i=0; i<local_Ny; ++i)
+            for (int j=0; j<pml_size_x; ++j)
+            {
+                ep[index(i,j,Nx)] = 1.0;
+                mux[index(i,j,Nx)] = 1;
+                muy[index(i,j,Nx)] = 1;
+            }
+            
+            for (int j=pml_size_x; j<Nx-pml_size_x; ++j)
             {
                 ep[index(i,j,Nx)] = 1.0;
                 mux[index(i,j,Nx)] = c * dt;
                 muy[index(i,j,Nx)] = c * dt;
+            }
+            
+            for (int j=Nx-pml_size_x; j<Nx; ++j)
+            {
+                ep[index(i,j,Nx)] = 1.0;
+                mux[index(i,j,Nx)] = 1;
+                muy[index(i,j,Nx)] = 1;
             }
         }
         
