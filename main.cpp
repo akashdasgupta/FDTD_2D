@@ -66,13 +66,8 @@ int main(int argc, char *argv[])
     PML_coefs *HyX_coefs = new PML_coefs[pml_size_x];
     PML_coefs *DzX_coefs = new PML_coefs[pml_size_x];
     
-    param_setter(HxX_coefs, HyX_coefs, DzX_coefs,sigma_x,sigma_y, 1, 1, dt, pml_size_x);
+    param_setter_x(HxX_coefs, HyX_coefs, DzX_coefs,sigma_x,sigma_y, 1, 1, dt, pml_size_x);
 
-    PML_coefs *HxY_coefs = new PML_coefs[pml_size_y];
-    PML_coefs *HyY_coefs = new PML_coefs[pml_size_y];
-    PML_coefs *DzY_coefs = new PML_coefs[pml_size_y];
-    
-    param_setter(HxY_coefs, HyY_coefs, DzY_coefs,sigma_x,sigma_y, 1, 1, dt, pml_size_x);
     
     if (rank == 0)
     {
@@ -116,6 +111,13 @@ int main(int argc, char *argv[])
                 muy[index(i,j,Nx)] = 1;
             }
         }
+        
+//         PML_coefs *HxY_coefs = new PML_coefs[pml_size_y];
+//         PML_coefs *HyY_coefs = new PML_coefs[pml_size_y];
+//         PML_coefs *DzY_coefs = new PML_coefs[pml_size_y];
+//         
+//         param_setter(HxY_coefs, HyY_coefs, DzY_coefs,sigma_x,sigma_y, 1, 1, dt, pml_size_x);
+
         
         double *IHx = new double[2 * local_Ny * pml_size_x];
         double *IHy = new double[2 * local_Ny * pml_size_y];
@@ -380,9 +382,6 @@ int main(int argc, char *argv[])
     delete HxX_coefs;
     delete HyX_coefs;
     delete DzX_coefs;
-    delete HxY_coefs;
-    delete HyY_coefs;
-    delete DzY_coefs;
     
     MPI_Finalize();    
     return 0;

@@ -73,7 +73,7 @@ for t in np.arange(0,iterations,1):
                 image[global_i, j] = E
             global_i += 1
         if t%10 == 0:
-            ims.append([plt.imshow(image**2, cmap='inferno', vmin=0, vmax=0.01)])  
+            ims.append([plt.imshow(image, cmap='coolwarm', vmin=-0.1, vmax=0.1)])  
             plt.show()           
 
 ani = animation.ArtistAnimation(fig,ims, interval=33)
