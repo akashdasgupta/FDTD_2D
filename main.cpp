@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
     std::string savefile_path{"data"};
     int Nx{100};
     int Ny{100};
-    int iterations{600};
+    int iterations{300};
     double dx {0.1e-8};
     double dy {0.1e-8};
     double dt {dx / (2*c)};
@@ -77,10 +77,10 @@ int main(int argc, char *argv[])
     if (rank == 0)
     {
         
-        for (int i=0; i<pml_size_x; ++i)
-        {
-             std::cout << sigma_x[i] << '\n';
-        }
+//          for (int i=0; i<pml_size_x; ++i)
+//          {
+//               std::cout << HyX_coefs[i] << '\n';
+//          }
         
         
         int local_Ny = worker_Ny_base;
@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
         
         int source_center_y {12};
         std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << std::endl ;
-
+        
 
         for (int t=1; t<iterations; ++t)
         {
@@ -253,8 +253,8 @@ int main(int argc, char *argv[])
             {
                 bottom[k-index(local_Ny-1, 0, Nx)] = sim_space[k];
             }
-            sim_space[index(source_center_y,source_center, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(source_center_y,source_center, Nx)].InjectDz(sourceE[t]);
+            sim_space[index(source_center_y,12, Nx)].InjectEz(sourceE[t]);
+            sim_space[index(source_center_y,12, Nx)].InjectDz(sourceE[t]);
 
             MPI_Sendrecv(top, Nx, MPI_POINT, above_me ,
                         t, row_from_bellow , Nx,
@@ -267,8 +267,12 @@ int main(int argc, char *argv[])
                         MPI_COMM_WORLD, &status);        
 
             update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, row_from_bellow, pml_size_x, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
-            //void update_E_worker(Point space[], int Nx, int Ny, double ep[], double dx, double dy, double dt, Point row_above[],int pml_size, PML_coefs coefs_Dz[], double IDz[], double ICDz[]);
+
             update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, row_from_above, pml_size_x, DzX_coefs, IDz, ICDz); 
+            std::cout << "t= " << t << 
+            " Hx= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHx()<<
+            " Hy= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHy() <<
+            " Dz= "<<sim_space[index(local_Ny-1, 0, Nx)].GetDz()  << std::endl;
                 
             SaveToFile(Nx*local_Ny, sim_space, "data/"+std::to_string(rank)+".txt");   
         }

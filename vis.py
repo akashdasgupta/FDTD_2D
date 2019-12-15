@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -21,7 +22,7 @@ def index(i,j,t, Nx, Ny):
 Nx = 100
 Ny = 100
 num_ranks = 4
-iterations = 100
+iterations = 250
 
 filenames = ['0TOP.txt']
 for i in np.arange(1,num_ranks,1):
@@ -42,11 +43,7 @@ for i in np.arange(1,num_ranks,1):
         ny_sizes.append(base_ny)
 
 ny_sizes.append(base_ny - int(base_ny/2))
-
-        
-        
-        
-        
+     
 filepath= r'/home/akash/4th_year_computing/FDTD_2D/data'
 data = {}
 
@@ -72,14 +69,15 @@ for t in np.arange(0,iterations,1):
     for filename, local_ny in zip(filenames, ny_sizes):
         for i in range(local_ny):
             for j in range(Nx):
-                E = data[filename][index(i,j,t,Nx,local_ny)][3]
+                E = data[filename][index(i,j,t,Nx,local_ny)][1]
                 image[global_i, j] = E
             global_i += 1
-    # ims.append([plt.imshow(image**2, cmap='inferno', vmin=0, vmax=0.01)]) 
-    # plt.show()               
+        if t%10 == 0:
+            ims.append([plt.imshow(image**2, cmap='inferno', vmin=0, vmax=0.01)])  
+            plt.show()           
 
-# ani = animation.ArtistAnimation(fig,ims, interval=33)
-# ani.save('dynamic_images.mp4')
-# plt.show()
-
+ani = animation.ArtistAnimation(fig,ims, interval=33)
+ani.save('dynamic_images.mp4')
+plt.show()
+#plt.close('all')
 print(time.time() - start_time)
