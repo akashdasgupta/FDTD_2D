@@ -19,7 +19,6 @@ void SaveToFile(int size, Point row[], std::string name)
 
 }
 
-
 int main(int argc, char *argv[])
 {
     // Initilise and find 
@@ -41,70 +40,55 @@ int main(int argc, char *argv[])
     std::string savefile_path{"data"};
     int Nx{100};
     int Ny{100};
-    int iterations{300};
+    int iterations{3000};
     double dx {0.1e-8};
     double dy {0.1e-8};
-    double dt {dx / (2*c)};
+    double dt {dx / (4*c)};
     
-    double source_sigma{10*dt};
+    double source_sigma{20*dt};
     double t0 {6 * source_sigma};
     
-    int pml_size_x{Nx / 10};
-    int pml_size_y{Ny / 10};    
+    int pml_size{Nx / 10};
+   
     
-    int worker_Ny_base = Ny / size ;
-    int worker_Ny_remainder = Ny % size;
+    int worker_Ny_base = (Ny-(2*pml_size)) / (size- 1);
+    int worker_Ny_remainder = (Ny-(2*pml_size)) % (size-1);
     
     int source_center{50};
     int rank_occuring {50 / worker_Ny_base};
+    std::cout << rank_occuring << '\n';
     
-    double *sigma_x = new double[pml_size_x];
-    double *sigma_y = new double[pml_size_y];
-    sigma_setter(sigma_x,sigma_y, pml_size_x, pml_size_y,dt);
+    double *sigma_x = new double[pml_size];
+    double *sigma_y = new double[pml_size];
+    sigma_setter(sigma_x,sigma_y, pml_size,dt);
     
-    PML_coefs *HxX_coefs = new PML_coefs[pml_size_x];
-    PML_coefs *HyX_coefs = new PML_coefs[pml_size_x];
-    PML_coefs *DzX_coefs = new PML_coefs[pml_size_x];
+    PML_coefs *HxX_coefs = new PML_coefs[pml_size];
+    PML_coefs *HyX_coefs = new PML_coefs[pml_size];
+    PML_coefs *DzX_coefs = new PML_coefs[pml_size];
     
-    param_setter_x(HxX_coefs, HyX_coefs, DzX_coefs,sigma_x,sigma_y, 1, 1, dt, pml_size_x);
+    param_setter_x(HxX_coefs, HyX_coefs, DzX_coefs,sigma_x, 1, 1, dt, pml_size);
 
     
     if (rank == 0)
     {
         
-//          for (int i=0; i<pml_size_x; ++i)
+//          for (int i=0; i<pml_size; ++i)
 //          {
 //               std::cout << HyX_coefs[i] << '\n';
 //          }
         
         
-        int local_Ny = worker_Ny_base;
-        int split_size{local_Ny / 2};
-        Point *sim_space_top = new Point[split_size*Nx];
-        Point *sim_space_bottom = new Point[(local_Ny-split_size)*Nx];
+        Point *sim_space_top = new Point[pml_size*Nx];
+        Point *sim_space_bottom = new Point[pml_size*Nx];
 
-        double *ep = new double[local_Ny*Nx];
-        double *mux = new double[local_Ny*Nx];
-        double *muy = new double[local_Ny*Nx];
+        double *ep = new double[pml_size*Nx];
+        double *mux = new double[pml_size*Nx];
+        double *muy = new double[pml_size*Nx];
 
 
-        for (int i=0; i<local_Ny; ++i)
+        for (int i=0; i<pml_size; ++i)
         {
-            for (int j=0; j<pml_size_x; ++j)
-            {
-                ep[index(i,j,Nx)] = 1.0;
-                mux[index(i,j,Nx)] = 1;
-                muy[index(i,j,Nx)] = 1;
-            }
-            
-            for (int j=pml_size_x; j<Nx-pml_size_x; ++j)
-            {
-                ep[index(i,j,Nx)] = 1.0;
-                mux[index(i,j,Nx)] = c * dt;
-                muy[index(i,j,Nx)] = c * dt;
-            }
-            
-            for (int j=Nx-pml_size_x; j<Nx; ++j)
+            for (int j=0; j<Nx; ++j)
             {
                 ep[index(i,j,Nx)] = 1.0;
                 mux[index(i,j,Nx)] = 1;
@@ -112,17 +96,26 @@ int main(int argc, char *argv[])
             }
         }
         
-//         PML_coefs *HxY_coefs = new PML_coefs[pml_size_y];
-//         PML_coefs *HyY_coefs = new PML_coefs[pml_size_y];
-//         PML_coefs *DzY_coefs = new PML_coefs[pml_size_y];
-//         
-//         param_setter(HxY_coefs, HyY_coefs, DzY_coefs,sigma_x,sigma_y, 1, 1, dt, pml_size_x);
+        PML_coefs *HxY_coefs_top = new PML_coefs[pml_size*Nx];
+        PML_coefs *HyY_coefs_top = new PML_coefs[pml_size*Nx];
+        PML_coefs *DzY_coefs_top = new PML_coefs[pml_size*Nx];
+        param_setter_ytop(HxY_coefs_top,HyY_coefs_top,DzY_coefs_top,sigma_x, sigma_x,1,1,dt,pml_size, Nx);
 
         
-        double *IHx = new double[2 * local_Ny * pml_size_x];
-        double *IHy = new double[2 * local_Ny * pml_size_y];
-        double *ICHx = new double[2 * local_Ny * pml_size_x];
-        double *ICHy = new double[2 * local_Ny * pml_size_y];
+        double *IDz_top = new double[Nx * pml_size];
+        double *ICHx_top = new double[Nx * pml_size];
+        double *ICHy_top = new double[Nx * pml_size];
+        
+        PML_coefs *HxY_coefs_bottom = new PML_coefs[pml_size*Nx];
+        PML_coefs *HyY_coefs_bottom = new PML_coefs[pml_size*Nx];
+        PML_coefs *DzY_coefs_bottom = new PML_coefs[pml_size*Nx];
+        param_setter_ybottom(HxY_coefs_bottom,HyY_coefs_bottom,DzY_coefs_bottom,sigma_x, sigma_x,1,1,dt,pml_size, Nx);
+
+        
+        double *IDz_bottom = new double[Nx * pml_size];
+        double *ICHx_bottom = new double[Nx * pml_size];
+        double *ICHy_bottom = new double[Nx * pml_size];
+
 
 
         Point *bottom = new Point[Nx];
@@ -142,9 +135,9 @@ int main(int argc, char *argv[])
                 top[k] = sim_space_bottom[k];
             }
             
-            for (int k=index(split_size-1, 0, Nx); k<index(split_size-1, Nx, Nx); ++k)
+            for (int k=index(pml_size-1, 0, Nx); k<index(pml_size-1, Nx, Nx); ++k)
             {
-                bottom[k-index(split_size-1, 0, Nx)] = sim_space_top[k];
+                bottom[k-index(pml_size-1, 0, Nx)] = sim_space_top[k];
 
             } //2e5 kai
             
@@ -160,17 +153,17 @@ int main(int argc, char *argv[])
                         MPI_POINT, above_me,t+iterations,
                         MPI_COMM_WORLD, &status);                
 
-            //update_H_worker(sim_space_top, Nx, split_size, mux, muy, dx, dy,row_from_bellow);
-            //update_E_master(sim_space_top, Nx, split_size, ep,dx, dy, dt);
+            update_H_master_top(sim_space_top, Nx, pml_size, mux, muy, dx, dy, row_from_bellow, HxY_coefs_top, HyY_coefs_top,ICHx_top, ICHy_top);
+            update_E_master_top(sim_space_top, Nx, pml_size, ep,dx, dy, dt, DzY_coefs_top,IDz_top);
             
-            //void update_H_worker(Point space[], int Nx, int Ny, double mux[], double muy[], double dx, double dy, Point row_bellow[], int pml_size, PML_coefs coefs_Hx[], PML_coefs coefs_Hy[], double IHx[], double IHy[], double ICHx[], double ICHy[]);
+            update_H_master_bottom(sim_space_bottom, Nx, pml_size, mux, muy, dx, dy, HxY_coefs_bottom, HyY_coefs_bottom,ICHx_bottom, ICHy_bottom);
+            update_E_master_bottom(sim_space_bottom, Nx, pml_size, ep,dx, dy, dt, row_from_above, DzY_coefs_bottom,IDz_bottom);
 
             
-            //update_H_master(sim_space_bottom, Nx, local_Ny-split_size, mux, muy, dx, dy);
-            //update_E_worker(sim_space_bottom, Nx, local_Ny-split_size, ep,dx, dy, dt,row_from_above);
             
-            SaveToFile(Nx*split_size, sim_space_top, "data/"+std::to_string(rank)+"TOP.txt");
-            SaveToFile(Nx*(local_Ny-split_size), sim_space_bottom, "data/"+std::to_string(rank)+"BOTTOM.txt");
+            
+            SaveToFile(Nx*pml_size, sim_space_top, "data/"+std::to_string(rank)+"TOP.txt");
+            SaveToFile(Nx*(pml_size), sim_space_bottom, "data/"+std::to_string(rank)+"BOTTOM.txt");
         }
 
             
@@ -188,7 +181,7 @@ int main(int argc, char *argv[])
     else if (rank == rank_occuring)
     {
         int local_Ny{};
-        if (rank <= worker_Ny_remainder)
+        if ((rank-1) < worker_Ny_remainder)
         {
             local_Ny = worker_Ny_base + 1;
         }
@@ -221,7 +214,6 @@ int main(int argc, char *argv[])
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
 
-
         inject_soft_source2(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
 
         Point *bottom = new Point[Nx];
@@ -230,19 +222,19 @@ int main(int argc, char *argv[])
         Point *row_from_above = new Point[Nx];
         Point *row_from_bellow = new Point[Nx];
 
-        double *IHx = new double[2 * local_Ny * pml_size_x];
-        double *IHy = new double[2 * local_Ny * pml_size_y];
-        double *IDz = new double[2 * local_Ny * pml_size_y];
+        double *IHx = new double[2 * local_Ny * pml_size];
+        double *IHy = new double[2 * local_Ny * pml_size];
+        double *IDz = new double[2 * local_Ny * pml_size];
 
-        double *ICHx = new double[2 * local_Ny * pml_size_x];
-        double *ICHy = new double[2 * local_Ny * pml_size_y];
-        double *ICDz = new double[2 * local_Ny * pml_size_y];
+        double *ICHx = new double[2 * local_Ny * pml_size];
+        double *ICHy = new double[2 * local_Ny * pml_size];
+        double *ICDz = new double[2 * local_Ny * pml_size];
 
 
         
-        int source_center_y {12};
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << std::endl ;
-        
+        int source_center_y {local_Ny/2};
+        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me <<"I think my y size is :  " <<local_Ny << '\n';
+       
 
         for (int t=1; t<iterations; ++t)
         {
@@ -255,8 +247,8 @@ int main(int argc, char *argv[])
             {
                 bottom[k-index(local_Ny-1, 0, Nx)] = sim_space[k];
             }
-            sim_space[index(source_center_y,12, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(source_center_y,12, Nx)].InjectDz(sourceE[t]);
+            sim_space[index(source_center_y,50, Nx)].InjectEz(sourceE[t]);
+            sim_space[index(source_center_y,50, Nx)].InjectDz(sourceE[t]);
 
             MPI_Sendrecv(top, Nx, MPI_POINT, above_me ,
                         t, row_from_bellow , Nx,
@@ -266,15 +258,18 @@ int main(int argc, char *argv[])
             MPI_Sendrecv(bottom, Nx, MPI_POINT, under_me ,
                         t+iterations, row_from_above, Nx,
                         MPI_POINT, above_me,t+iterations,
-                        MPI_COMM_WORLD, &status);        
+                        MPI_COMM_WORLD, &status);    
 
-            update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, row_from_bellow, pml_size_x, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
+            update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, row_from_bellow, pml_size, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
 
-            update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, row_from_above, pml_size_x, DzX_coefs, IDz, ICDz); 
-            std::cout << "t= " << t << 
-            " Hx= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHx()<<
-            " Hy= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHy() <<
-            " Dz= "<<sim_space[index(local_Ny-1, 0, Nx)].GetDz()  << std::endl;
+            update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, row_from_above, pml_size, DzX_coefs, IDz, ICDz);
+
+
+ 
+//             std::cout << "t= " << t << 
+//             " Hx= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHx()<<
+//             " Hy= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHy() <<
+//             " Dz= "<<sim_space[index(local_Ny-1, 0, Nx)].GetDz()  << std::endl;
                 
             SaveToFile(Nx*local_Ny, sim_space, "data/"+std::to_string(rank)+".txt");   
         }
@@ -293,7 +288,7 @@ int main(int argc, char *argv[])
     else 
     {
         int local_Ny {};
-        if (rank <= worker_Ny_remainder)
+        if ((rank-1) < worker_Ny_remainder)
         {
             local_Ny = worker_Ny_base + 1;
         }
@@ -322,20 +317,21 @@ int main(int argc, char *argv[])
         Point *row_from_above = new Point[Nx];
         Point *row_from_bellow = new Point[Nx];
         
-        double *IHx = new double[2 * local_Ny * pml_size_x];
-        double *IHy = new double[2 * local_Ny * pml_size_y];
-        double *IDz = new double[2 * local_Ny * pml_size_y];
+        double *IHx = new double[2 * local_Ny * pml_size];
+        double *IHy = new double[2 * local_Ny * pml_size];
+        double *IDz = new double[2 * local_Ny * pml_size];
 
-        double *ICHx = new double[2 * local_Ny * pml_size_x];
-        double *ICHy = new double[2 * local_Ny * pml_size_y];
-        double *ICDz = new double[2 * local_Ny * pml_size_y];
+        double *ICHx = new double[2 * local_Ny * pml_size];
+        double *ICHy = new double[2 * local_Ny * pml_size];
+        double *ICDz = new double[2 * local_Ny * pml_size];
 
                 
 
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
 
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << std::endl ;
+        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << "I think my y size is :  " <<local_Ny << '\n';
+
 
         for (int t=1; t<iterations; ++t)
         {            
@@ -360,8 +356,9 @@ int main(int argc, char *argv[])
                         MPI_POINT, above_me,t+iterations,
                         MPI_COMM_WORLD, &status);
 
-            update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, row_from_bellow, pml_size_x, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
-            update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, row_from_above, pml_size_x, DzX_coefs, IDz, ICDz); 
+            update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, row_from_bellow, pml_size, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
+            
+            update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, row_from_above, pml_size, DzX_coefs, IDz, ICDz); 
             
             SaveToFile(Nx*local_Ny, sim_space, "data/"+std::to_string(rank)+".txt");
 

@@ -31,7 +31,9 @@ public:
 
 
 };
-
-void sigma_setter(double sigma_x[], double sigma_y[], int pml_size_x, int pml_size_y, double dt);
-void param_setter_x(PML_coefs Hx[], PML_coefs Hy[], PML_coefs Dz[], double sigma_x[], double sigma_y[], double mu_x, double mu_y, double dt, int size);
+int index(int i,int j, int Nx);
+void sigma_setter(double sigma_x[], double sigma_y[], int pml_size, double dt);
+void param_setter_x(PML_coefs Hx[], PML_coefs Hy[], PML_coefs Dz[], double sigma_x[], double mu_x, double mu_y, double dt, int size);
+void param_setter_ytop(PML_coefs Hx[], PML_coefs Hy[], PML_coefs Dz[], double sigma_x[], double sigma_y[],  double mu_x, double mu_y, double dt,  int pml_size, int Nx);
+void param_setter_ybottom(PML_coefs Hx[], PML_coefs Hy[], PML_coefs Dz[], double sigma_x[], double sigma_y[],  double mu_x, double mu_y, double dt, int pml_size, int Nx);
 #endif

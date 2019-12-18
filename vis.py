@@ -21,8 +21,9 @@ def index(i,j,t, Nx, Ny):
 
 Nx = 100
 Ny = 100
-num_ranks = 4
-iterations = 250
+num_ranks = 8
+iterations = 2999
+pml=10
 
 filenames = ['0TOP.txt']
 for i in np.arange(1,num_ranks,1):
@@ -31,18 +32,18 @@ filenames.append('0BOTTOM.txt')
 
 
 ny_sizes = []
-base_ny = int(Ny / num_ranks)
-ny_remainder = Ny % num_ranks
+base_ny = int((Ny-2*pml) / (num_ranks-1))
+ny_remainder = (Ny-2*pml) % (num_ranks-1)
 
-ny_sizes.append(int(base_ny/2))
+ny_sizes.append(pml)
 
 for i in np.arange(1,num_ranks,1):
-    if i <= ny_remainder:
+    if i-1 < ny_remainder:
         ny_sizes.append(base_ny+1)
     else:
         ny_sizes.append(base_ny)
 
-ny_sizes.append(base_ny - int(base_ny/2))
+ny_sizes.append(pml)
      
 filepath= r'/home/akash/4th_year_computing/FDTD_2D/data'
 data = {}
@@ -63,6 +64,7 @@ image = np.zeros((Nx,Ny))
 ims = []
 fig = plt.figure()
 
+power = []
 
 for t in np.arange(0,iterations,1):
     global_i = 0
@@ -72,12 +74,13 @@ for t in np.arange(0,iterations,1):
                 E = data[filename][index(i,j,t,Nx,local_ny)][1]
                 image[global_i, j] = E
             global_i += 1
+            power.append(np.mean(image**2))
         if t%10 == 0:
             ims.append([plt.imshow(image, cmap='coolwarm', vmin=-0.1, vmax=0.1)])  
             plt.show()           
 
 ani = animation.ArtistAnimation(fig,ims, interval=33)
 ani.save('dynamic_images.mp4')
-plt.show()
-#plt.close('all')
+# plt.show()
+plt.close('all')
 print(time.time() - start_time)
