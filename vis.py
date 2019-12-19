@@ -19,10 +19,18 @@ start_time = time.time()
 def index(i,j,t, Nx, Ny):
     return((Nx*Ny*(t)) + (i*Nx) + j)
 
-Nx = 100
-Ny = 100
+def indexer(index, Nx, Ny, iterations):
+    base = Nx * Ny
+    t = int(index / base)
+    i = int((index-(t*Nx*Ny)) / Nx)
+    j = index - (t*Nx * Ny) - (Nx*i)
+    
+    return t,i,j
+
+Nx = 1000
+Ny = 1000
 num_ranks = 8
-iterations = 2999
+iterations = 1200
 pml=10
 
 filenames = ['0TOP.txt']
@@ -31,7 +39,7 @@ for i in np.arange(1,num_ranks,1):
 filenames.append('0BOTTOM.txt')
 
 
-ny_sizes = []
+ny_sizes = []* iterations
 base_ny = int((Ny-2*pml) / (num_ranks-1))
 ny_remainder = (Ny-2*pml) % (num_ranks-1)
 
@@ -46,41 +54,48 @@ for i in np.arange(1,num_ranks,1):
 ny_sizes.append(pml)
      
 filepath= r'/home/akash/4th_year_computing/FDTD_2D/data'
-data = {}
+# data = {}
 
-for filename in filenames:
-    holder = []
-    path = filepath + '/' + filename
+# for filename in filenames:
+#     holder = []
+#     path = filepath + '/' + filename
     
+#     with open(path,'r') as file:
+#         reader=csv.reader(file)
+#         for row in reader:
+#             holder.append(row)
+#     data[filename] = holder
+
+
+images = [np.zeros((Nx,Ny)) for i in range (iterations)]
+
+
+
+
+global_i = 0
+for filename, local_ny in zip(filenames, ny_sizes):
+    path = filepath + '/' + filename
     with open(path,'r') as file:
         reader=csv.reader(file)
+        counter = 0
         for row in reader:
-            holder.append(row)
-    data[filename] = holder
-
-
-image = np.zeros((Nx,Ny))
-
+            try:
+                t,i,j = indexer(counter,Nx,local_ny, iterations)
+                images[t][global_i+i,j] = float(row[0])
+                counter += 1
+                #print(j)
+                #print(i)
+            except:
+                pass
+        global_i += local_ny
+        
 ims = []
 fig = plt.figure()
 
-power = []
-
-for t in np.arange(0,iterations,1):
-    global_i = 0
-    for filename, local_ny in zip(filenames, ny_sizes):
-        for i in range(local_ny):
-            for j in range(Nx):
-                E = data[filename][index(i,j,t,Nx,local_ny)][1]
-                image[global_i, j] = E
-            global_i += 1
-            power.append(np.mean(image**2))
-        if t%10 == 0:
-            ims.append([plt.imshow(image, cmap='coolwarm', vmin=-0.1, vmax=0.1)])  
-            plt.show()           
-
+for i in images:
+    ims.append([plt.imshow(i, vmin=-0.1, vmax=0.1)])
 ani = animation.ArtistAnimation(fig,ims, interval=33)
 ani.save('dynamic_images.mp4')
-# plt.show()
-plt.close('all')
+plt.show()
+# #plt.close('all')
 print(time.time() - start_time)

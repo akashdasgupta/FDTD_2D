@@ -38,14 +38,14 @@ int main(int argc, char *argv[])
     double c{299792458};
 
     std::string savefile_path{"data"};
-    int Nx{100};
-    int Ny{100};
-    int iterations{3000};
-    double dx {0.1e-8};
-    double dy {0.1e-8};
+    int Nx{1000};
+    int Ny{1000};
+    int iterations{12000};
+    double dx {0.01e-8};
+    double dy {0.01e-8};
     double dt {dx / (4*c)};
     
-    double source_sigma{20*dt};
+    double source_sigma{30*dt};
     double t0 {6 * source_sigma};
     
     int pml_size{Nx / 10};
@@ -161,9 +161,11 @@ int main(int argc, char *argv[])
 
             
             
-            
+            if(t%10 == 0)
+            {
             SaveToFile(Nx*pml_size, sim_space_top, "data/"+std::to_string(rank)+"TOP.txt");
             SaveToFile(Nx*(pml_size), sim_space_bottom, "data/"+std::to_string(rank)+"BOTTOM.txt");
+            }
         }
 
             
@@ -233,7 +235,7 @@ int main(int argc, char *argv[])
 
         
         int source_center_y {local_Ny/2};
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me <<"I think my y size is :  " <<local_Ny << '\n';
+        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me <<" I think my y size is :  " <<local_Ny << '\n';
        
 
         for (int t=1; t<iterations; ++t)
@@ -270,8 +272,10 @@ int main(int argc, char *argv[])
 //             " Hx= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHx()<<
 //             " Hy= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHy() <<
 //             " Dz= "<<sim_space[index(local_Ny-1, 0, Nx)].GetDz()  << std::endl;
-                
-            SaveToFile(Nx*local_Ny, sim_space, "data/"+std::to_string(rank)+".txt");   
+                        if(t%10 == 0)
+            {                
+            SaveToFile(Nx*local_Ny, sim_space, "data/"+std::to_string(rank)+".txt"); 
+            }
         }
 
         delete ep;
@@ -330,7 +334,7 @@ int main(int argc, char *argv[])
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
 
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << "I think my y size is :  " <<local_Ny << '\n';
+        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << " I think my y size is :  " <<local_Ny << '\n';
 
 
         for (int t=1; t<iterations; ++t)
@@ -360,7 +364,10 @@ int main(int argc, char *argv[])
             
             update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, row_from_above, pml_size, DzX_coefs, IDz, ICDz); 
             
+                        if(t%10 == 0)
+            {            
             SaveToFile(Nx*local_Ny, sim_space, "data/"+std::to_string(rank)+".txt");
+            }
 
         }
 
