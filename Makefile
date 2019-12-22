@@ -1,7 +1,7 @@
 CC = mpic++
 IDIR = include
 
-CFLAGS = -I $(IDIR) -O3
+CFLAGS = -I $(IDIR) -O1
 
 SRC = $(wildcard *.cpp)
 NAME = a.out
@@ -12,4 +12,4 @@ $(NAME): $(SRC)
 
 .PHONY: clean
 clean:
-	@rm -f $(NAME) data/*
+	@rm -f $(NAME) data/* runfile.* 

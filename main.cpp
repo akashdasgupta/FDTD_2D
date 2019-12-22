@@ -38,29 +38,38 @@ int main(int argc, char *argv[])
     double c{299792458};
 
     std::string savefile_path{"data"};
-    int Nx{1000};
-    int Ny{1000};
-    int iterations{12000};
-    double dx {0.01e-8};
-    double dy {0.01e-8};
+    int Nx{200};
+    int Ny{200};
+    int iterations{5000};
+    double dx {0.1e-8};
+    double dy {0.1e-8};
     double dt {dx / (4*c)};
     
     double source_sigma{30*dt};
     double t0 {6 * source_sigma};
     
     int pml_size{Nx / 10};
+    
+    int which_frame{0};
+    int num_frame[30];
+    for(int i=0;i<30;++i)
+    {
+        num_frame[i] = i * iterations/30;
+    }
+    num_frame[0] = 1;
    
     
     int worker_Ny_base = (Ny-(2*pml_size)) / (size- 1);
     int worker_Ny_remainder = (Ny-(2*pml_size)) % (size-1);
     
-    int source_center{50};
-    int rank_occuring {50 / worker_Ny_base};
+    int source_center{Nx/2};
+    int rank_occuring {(Nx/2) / worker_Ny_base};
     std::cout << rank_occuring << '\n';
     
     double *sigma_x = new double[pml_size];
     double *sigma_y = new double[pml_size];
     sigma_setter(sigma_x,sigma_y, pml_size,dt);
+    
     
     PML_coefs *HxX_coefs = new PML_coefs[pml_size];
     PML_coefs *HyX_coefs = new PML_coefs[pml_size];
@@ -135,12 +144,15 @@ int main(int argc, char *argv[])
                 top[k] = sim_space_bottom[k];
             }
             
-            for (int k=index(pml_size-1, 0, Nx); k<index(pml_size-1, Nx, Nx); ++k)
+            for (int k=index(pml_size-1, 0, Nx); k<=index(pml_size-1, Nx-1, Nx); ++k)
             {
                 bottom[k-index(pml_size-1, 0, Nx)] = sim_space_top[k];
 
             } //2e5 kai
-            
+            MPI_Sendrecv(bottom, Nx, MPI_POINT, under_me ,
+                        t+iterations, row_from_above, Nx,
+                        MPI_POINT, above_me,t+iterations,
+                        MPI_COMM_WORLD, &status);                
 
             
             MPI_Sendrecv(top, Nx, MPI_POINT, above_me ,
@@ -148,10 +160,6 @@ int main(int argc, char *argv[])
                     MPI_POINT, under_me,t,
                     MPI_COMM_WORLD, &status);
 
-            MPI_Sendrecv(bottom, Nx, MPI_POINT, under_me ,
-                        t+iterations, row_from_above, Nx,
-                        MPI_POINT, above_me,t+iterations,
-                        MPI_COMM_WORLD, &status);                
 
             update_H_master_top(sim_space_top, Nx, pml_size, mux, muy, dx, dy, row_from_bellow, HxY_coefs_top, HyY_coefs_top,ICHx_top, ICHy_top);
             update_E_master_top(sim_space_top, Nx, pml_size, ep,dx, dy, dt, DzY_coefs_top,IDz_top);
@@ -161,10 +169,11 @@ int main(int argc, char *argv[])
 
             
             
-            if(t%10 == 0)
+            if(t == num_frame[which_frame])
             {
             SaveToFile(Nx*pml_size, sim_space_top, "data/"+std::to_string(rank)+"TOP.txt");
             SaveToFile(Nx*(pml_size), sim_space_bottom, "data/"+std::to_string(rank)+"BOTTOM.txt");
+            which_frame += 1;
             }
         }
 
@@ -217,6 +226,11 @@ int main(int argc, char *argv[])
         int under_me{(rank+1)%size};
 
         inject_soft_source2(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
+        
+//         for (int i=0; i<iterations; ++i)
+//         {
+//             std::cout << sourceE[i]<<std::endl;
+//         }
 
         Point *bottom = new Point[Nx];
         Point *top = new Point[Nx];
@@ -235,32 +249,24 @@ int main(int argc, char *argv[])
 
         
         int source_center_y {local_Ny/2};
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me <<" I think my y size is :  " <<local_Ny << '\n';
+        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me <<" I think my y size is :  " <<local_Ny << "AND..." <<'\n';
        
 
         for (int t=1; t<iterations; ++t)
         {
-            for (int k=0; k<Nx; ++k)
-            {
-                top[k] = sim_space[k];
-            }
+            sim_space[index(source_center_y,source_center, Nx)].InjectEz(sourceE[t]);
+            sim_space[index(source_center_y,source_center, Nx)].InjectDz(sourceE[t]);
 
-            for (int k=index(local_Ny-1, 0, Nx); k<index(local_Ny-1, Nx, Nx); ++k)
-            {
-                bottom[k-index(local_Ny-1, 0, Nx)] = sim_space[k];
-            }
-            sim_space[index(source_center_y,50, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(source_center_y,50, Nx)].InjectDz(sourceE[t]);
 
-            MPI_Sendrecv(top, Nx, MPI_POINT, above_me ,
+            MPI_Sendrecv(&sim_space[index(local_Ny-1, 0, Nx)], Nx, MPI_POINT, under_me ,
+                        t+iterations, row_from_above, Nx,
+                        MPI_POINT, above_me,t+iterations,
+                        MPI_COMM_WORLD, &status); 
+            MPI_Sendrecv(&sim_space[0], Nx, MPI_POINT, above_me ,
                         t, row_from_bellow , Nx,
                         MPI_POINT, under_me,t,
                         MPI_COMM_WORLD, &status);
 
-            MPI_Sendrecv(bottom, Nx, MPI_POINT, under_me ,
-                        t+iterations, row_from_above, Nx,
-                        MPI_POINT, above_me,t+iterations,
-                        MPI_COMM_WORLD, &status);    
 
             update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, row_from_bellow, pml_size, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
 
@@ -272,9 +278,10 @@ int main(int argc, char *argv[])
 //             " Hx= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHx()<<
 //             " Hy= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHy() <<
 //             " Dz= "<<sim_space[index(local_Ny-1, 0, Nx)].GetDz()  << std::endl;
-                        if(t%10 == 0)
+            if(t == num_frame[which_frame])
             {                
             SaveToFile(Nx*local_Ny, sim_space, "data/"+std::to_string(rank)+".txt"); 
+            which_frame+=1;
             }
         }
 
@@ -315,8 +322,6 @@ int main(int argc, char *argv[])
             }
         }
 
-        Point *bottom = new Point[Nx];
-        Point *top = new Point[Nx];
         Point *sim_space = new Point[local_Ny*Nx];
         Point *row_from_above = new Point[Nx];
         Point *row_from_bellow = new Point[Nx];
@@ -339,34 +344,25 @@ int main(int argc, char *argv[])
 
         for (int t=1; t<iterations; ++t)
         {            
-            for (int k=0; k<Nx; ++k)
-            {
-                top[k] = sim_space[k];
-            }
+                        MPI_Sendrecv(&sim_space[index(local_Ny-1, 0, Nx)], Nx, MPI_POINT, under_me ,
+                        t+iterations, row_from_above, Nx,
+                        MPI_POINT, above_me,t+iterations,
+                        MPI_COMM_WORLD, &status);
 
-            for (int k=index(local_Ny-1, 0, Nx); k<index(local_Ny-1, Nx, Nx); ++k)
-            {
-                bottom[k-index(local_Ny-1, 0, Nx)] = sim_space[k];
-
-            }
-
-            MPI_Sendrecv(top, Nx, MPI_POINT, above_me ,
+            MPI_Sendrecv(&sim_space[0], Nx, MPI_POINT, above_me ,
                     t, row_from_bellow , Nx,
                     MPI_POINT, under_me,t,
                     MPI_COMM_WORLD, &status);
 
-            MPI_Sendrecv(bottom, Nx, MPI_POINT, under_me ,
-                        t+iterations, row_from_above, Nx,
-                        MPI_POINT, above_me,t+iterations,
-                        MPI_COMM_WORLD, &status);
 
             update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, row_from_bellow, pml_size, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
             
             update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, row_from_above, pml_size, DzX_coefs, IDz, ICDz); 
             
-                        if(t%10 == 0)
+            if(t == num_frame[which_frame])
             {            
             SaveToFile(Nx*local_Ny, sim_space, "data/"+std::to_string(rank)+".txt");
+            which_frame+=1;
             }
 
         }
@@ -374,8 +370,6 @@ int main(int argc, char *argv[])
         delete ep;
         delete mux ;
         delete muy;
-        delete top;
-        delete bottom;
         delete sim_space;
         delete row_from_above;
         delete row_from_bellow;

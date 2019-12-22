@@ -9,7 +9,7 @@ Created on Sat Nov 23 23:29:55 2019
 import numpy as np
 import csv
 from matplotlib import pyplot as plt
-import matplotlib.animation as animation
+#import matplotlib.animation as animation
 import time
 
 #import matplotlib
@@ -27,11 +27,12 @@ def indexer(index, Nx, Ny, iterations):
     
     return t,i,j
 
-Nx = 1000
-Ny = 1000
-num_ranks = 8
-iterations = 1200
-pml=10
+Nx = 200
+Ny = 200
+num_ranks = 5
+iterations = 30
+
+pml=int(Nx/10)
 
 filenames = ['0TOP.txt']
 for i in np.arange(1,num_ranks,1):
@@ -39,7 +40,7 @@ for i in np.arange(1,num_ranks,1):
 filenames.append('0BOTTOM.txt')
 
 
-ny_sizes = []* iterations
+ny_sizes = []
 base_ny = int((Ny-2*pml) / (num_ranks-1))
 ny_remainder = (Ny-2*pml) % (num_ranks-1)
 
@@ -53,6 +54,7 @@ for i in np.arange(1,num_ranks,1):
 
 ny_sizes.append(pml)
      
+#filepath= r'/newhome/ad16020/FDTD_2D/data'
 filepath= r'/home/akash/4th_year_computing/FDTD_2D/data'
 # data = {}
 
@@ -67,10 +69,7 @@ filepath= r'/home/akash/4th_year_computing/FDTD_2D/data'
 #     data[filename] = holder
 
 
-images = [np.zeros((Nx,Ny)) for i in range (iterations)]
-
-
-
+images = [np.zeros((Nx,Ny)) for i in range (int(iterations))]
 
 global_i = 0
 for filename, local_ny in zip(filenames, ny_sizes):
@@ -89,13 +88,21 @@ for filename, local_ny in zip(filenames, ny_sizes):
                 pass
         global_i += local_ny
         
-ims = []
-fig = plt.figure()
+# ims = []
+# fig = plt.figure()
 
-for i in images:
-    ims.append([plt.imshow(i, vmin=-0.1, vmax=0.1)])
-ani = animation.ArtistAnimation(fig,ims, interval=33)
-ani.save('dynamic_images.mp4')
-plt.show()
+for i, image in enumerate(images):
+    # ims.append([plt.imshow(i, vmin=0, vmax=1e-8, cmap='jet')])
+    plt.imshow(image, vmin=-0.02, vmax=0.02, cmap='jet')
+    #plt.savefig('/newhome/ad16020/FDTD_2D/temp/'+str(i)+'.png', dpi=100)    
+    plt.savefig('/home/akash/4th_year_computing/FDTD_2D/temp/'+str(i)+'.png', dpi=100)
+
+    plt.close('all')
+    
+    
+    
+# ani = animation.ArtistAnimation(fig,ims, interval=33)
+# ani.save('dynamic_images.mp4')
+# plt.show()
 # #plt.close('all')
 print(time.time() - start_time)
