@@ -53,8 +53,8 @@ void inject_soft_source2(double Ez[], double Hx[], double Hy[], int iterations, 
     {
         //std::cout<< std::exp(-1 * ((t[i] - t0)/ sigma) * ((t[i] - t0)/ sigma)) << std::endl;
         Ez[i] = (0.5 * std::tanh(((t[i] - t0)/ sigma)) + 0.5) * std::sin(2 * 3.14159265359* c *t[i] / 520e-9);
-//         Hx[i] = Hx_over_E * std::exp(-1 * ((t[i] - t0+ deltahx) / sigma) * ((t[i] - t0+ deltahx)/ sigma));
-//         Hy[i] = Hy_over_E * std::exp(-1 * ((t[i] - t0+ deltahy) / sigma) * ((t[i] - t0+ deltahy)/ sigma));
+         Hx[i] = Hx_over_E * std::exp(-1 * ((t[i] - t0+ deltahx) / sigma) * ((t[i] - t0+ deltahx)/ sigma));
+         Hy[i] = Hy_over_E * std::exp(-1 * ((t[i] - t0+ deltahy) / sigma) * ((t[i] - t0+ deltahy)/ sigma));
         
     }
 }

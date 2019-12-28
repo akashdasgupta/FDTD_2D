@@ -30,21 +30,22 @@ def indexer(index, Nx, Ny, iterations):
 Nx = 200
 Ny = 200
 num_ranks = 5
-iterations = 30
-
-pml=int(Nx/10)
+iterations = 300
+pml=int(Nx/5)
 
 filenames = ['0TOP.txt']
 for i in np.arange(1,num_ranks,1):
     filenames.append(str(i)+'.txt') 
 filenames.append('0BOTTOM.txt')
 
+mpi_lines = []
 
 ny_sizes = []
 base_ny = int((Ny-2*pml) / (num_ranks-1))
 ny_remainder = (Ny-2*pml) % (num_ranks-1)
 
 ny_sizes.append(pml)
+
 
 for i in np.arange(1,num_ranks,1):
     if i-1 < ny_remainder:
@@ -53,6 +54,13 @@ for i in np.arange(1,num_ranks,1):
         ny_sizes.append(base_ny)
 
 ny_sizes.append(pml)
+
+line = 0
+for i in ny_sizes:
+    line += i
+    mpi_lines.append(line)
+
+mpi_linex = range(Nx)
      
 #filepath= r'/newhome/ad16020/FDTD_2D/data'
 filepath= r'/home/akash/4th_year_computing/FDTD_2D/data'
@@ -70,6 +78,8 @@ filepath= r'/home/akash/4th_year_computing/FDTD_2D/data'
 
 
 images = [np.zeros((Nx,Ny)) for i in range (int(iterations))]
+
+
 
 global_i = 0
 for filename, local_ny in zip(filenames, ny_sizes):
@@ -93,7 +103,10 @@ for filename, local_ny in zip(filenames, ny_sizes):
 
 for i, image in enumerate(images):
     # ims.append([plt.imshow(i, vmin=0, vmax=1e-8, cmap='jet')])
-    plt.imshow(image, vmin=-0.02, vmax=0.02, cmap='jet')
+    plt.imshow(image, vmin=-1e-3, vmax=1e-3, cmap='jet')
+    for size in mpi_lines:
+        plt.plot(mpi_linex, np.ones(len(mpi_linex)) * size, color='w')
+    
     #plt.savefig('/newhome/ad16020/FDTD_2D/temp/'+str(i)+'.png', dpi=100)    
     plt.savefig('/home/akash/4th_year_computing/FDTD_2D/temp/'+str(i)+'.png', dpi=100)
 
