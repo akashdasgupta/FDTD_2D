@@ -40,21 +40,21 @@ int main(int argc, char *argv[])
     std::string savefile_path{"data"};
     int Nx{200};
     int Ny{200};
-    int iterations{1000};
-    double dx {0.1e-8};
-    double dy {0.1e-8};
-    double dt {dx / (4*c)};
+    int iterations{10000};
+    double dx {0.01e-8};
+    double dy {0.01e-8};
+    double dt {dx / (2*c)};
     
     double source_sigma{10*dt};
     double t0 {6 * source_sigma};
     
-    int pml_size{Nx / 5};
+    int pml_size{Nx / 20};
     
     int which_frame{0};
-    int num_frame[300];
-    for(int i=0;i<300;++i)
+    int num_frame[3000];
+    for(int i=0;i<3000;++i)
     {
-        num_frame[i] = i * iterations/300;
+        num_frame[i] = i * iterations/3000;
     }
     num_frame[0] = 1;
    
@@ -126,13 +126,6 @@ int main(int argc, char *argv[])
         double *ICHx_bottom = new double[Nx * pml_size];
         double *ICHy_bottom = new double[Nx * pml_size];
 
-
-
-        Point *bottom = new Point[Nx];
-        Point *top = new Point[Nx];
-        Point *row_from_above = new Point[Nx];
-        Point *row_from_bellow = new Point[Nx];
-
         int above_me{size-1};
         int under_me{1};
 
@@ -154,11 +147,25 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
             
-                        update_H_master_top(sim_space_top, Nx, pml_size, mux, muy, dx, dy, HxY_coefs_top, HyY_coefs_top,ICHx_top, ICHy_top);
-            update_E_master_top(sim_space_top, Nx, pml_size, ep,dx, dy, dt, DzY_coefs_top,IDz_top);
+            update_H_master_top(sim_space_top, Nx, pml_size, mux, muy, dx, dy, HxY_coefs_top, HyY_coefs_top,ICHx_top, ICHy_top);
             
             update_H_master_bottom(sim_space_bottom, Nx, pml_size, mux, muy, dx, dy, HxY_coefs_bottom, HyY_coefs_bottom,ICHx_bottom, ICHy_bottom);
+
+            MPI_Sendrecv(&sim_space_bottom[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
+            above_me+t+(2*iterations), &sim_space_top[index(pml_size+1,0,Nx)] , Nx,
+            MPI_POINT, under_me,rank+t+(2*iterations),
+            MPI_COMM_WORLD, &status);
+            
+            MPI_Sendrecv(&sim_space_top[index(pml_size,0,Nx)], Nx, MPI_POINT, under_me ,
+            under_me+t+(3*iterations), &sim_space_bottom[0], Nx,
+            MPI_POINT, above_me,rank+t+(3*iterations),
+            MPI_COMM_WORLD, &status);
+
+            MPI_Barrier(MPI_COMM_WORLD);
+
+            update_E_master_top(sim_space_top, Nx, pml_size, ep,dx, dy, dt, DzY_coefs_top,IDz_top);
             update_E_master_bottom(sim_space_bottom, Nx, pml_size, ep,dx, dy, dt, DzY_coefs_bottom,IDz_bottom);
+
 
             
             if(t == num_frame[which_frame])
@@ -167,18 +174,16 @@ int main(int argc, char *argv[])
             SaveToFile(Nx*(pml_size), &sim_space_bottom[Nx], "data/"+std::to_string(rank)+"BOTTOM.txt");
             which_frame += 1;
             }
+
+
         }
 
             
             delete ep;
             delete mux ;
             delete muy;
-            delete top;
-            delete bottom;
             delete sim_space_top;
             delete sim_space_bottom;
-            delete row_from_above;
-            delete row_from_bellow;
     }
 
     else if (rank == rank_occuring)
@@ -197,6 +202,8 @@ int main(int argc, char *argv[])
         double *ep = new double[local_Ny*Nx];
         double *mux = new double[local_Ny*Nx];
         double *muy = new double[local_Ny*Nx];
+        
+        Point *sim_space = new Point[(local_Ny+2)*Nx];
 
 
         for (int i=0; i<local_Ny; ++i)
@@ -219,17 +226,6 @@ int main(int argc, char *argv[])
 
         inject_soft_source2(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
         
-//         for (int i=0; i<iterations; ++i)
-//         {
-//             std::cout << sourceE[i]<<std::endl;
-//         }
-
-        Point *bottom = new Point[Nx];
-        Point *top = new Point[Nx];
-        Point *sim_space = new Point[(local_Ny+2)*Nx];
-        Point *row_from_above = new Point[Nx];
-        Point *row_from_bellow = new Point[Nx];
-
         double *IHx = new double[2 * local_Ny * pml_size];
         double *IHy = new double[2 * local_Ny * pml_size];
         double *IDz = new double[2 * local_Ny * pml_size];
@@ -246,15 +242,9 @@ int main(int argc, char *argv[])
 
         for (int t=1; t<iterations; ++t)
         {
-//             if (t==90)
-//             {
-//             std::cout << "RANK: " << rank << " I sent over: " << '\n' << sim_space[index(1,100,Nx)];
-//             }
-                    
+            //std::cout <<  sim_space << IDz[0] <<'\n';        
             sim_space[index(source_center_y,source_center, Nx)].InjectEz(sourceE[t]);
             sim_space[index(source_center_y,source_center, Nx)].InjectDz(sourceE[t]);
-            //sim_space[index(source_center_y,source_center, Nx)].InjectHx(sourceHx[t]);
-            //sim_space[index(source_center_y,source_center, Nx)].InjectHy(sourceHy[t]);
 
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
                     above_me+t, &sim_space[index(local_Ny+1,0,Nx)] , Nx,
@@ -267,40 +257,35 @@ int main(int argc, char *argv[])
                         MPI_COMM_WORLD, &status);
             MPI_Barrier(MPI_COMM_WORLD);
 
-//             if (t==90)
-//             {
-//             std::cout << "RANK: " << rank << " I recieved: " << '\n' << sim_space[index(local_Ny+1,100,Nx)];
-//             }
             
             update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, pml_size, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
+            
+            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
+            above_me+t+(2*iterations), &sim_space[index(local_Ny+1,0,Nx)] , Nx,
+            MPI_POINT, under_me,rank+t+(2*iterations),
+            MPI_COMM_WORLD, &status);
+            
+            MPI_Sendrecv(&sim_space[index(local_Ny,0,Nx)], Nx, MPI_POINT, under_me ,
+            under_me+t+(3*iterations), &sim_space[0], Nx,
+            MPI_POINT, above_me,rank+t+(3*iterations),
+            MPI_COMM_WORLD, &status);
+
+            MPI_Barrier(MPI_COMM_WORLD);
 
             update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, pml_size, DzX_coefs, IDz, ICDz);
 
-
-
-
-
-
- 
-//             std::cout << "t= " << t << 
-//             " Hx= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHx()<<
-//             " Hy= "<<sim_space[index(local_Ny-1, 0, Nx)].GetHy() <<
-//             " Dz= "<<sim_space[index(local_Ny-1, 0, Nx)].GetDz()  << std::endl;
             if(t == num_frame[which_frame])
             {                
             SaveToFile(Nx*local_Ny, &sim_space[Nx], "data/"+std::to_string(rank)+".txt"); 
             which_frame+=1;
             }
+
         }
 
         delete ep;
         delete mux ;
         delete muy;
-        delete top;
-        delete bottom;
         delete sim_space;
-        delete row_from_above;
-        delete row_from_bellow;
 
     }
     
@@ -331,8 +316,6 @@ int main(int argc, char *argv[])
         }
 
         Point *sim_space = new Point[(local_Ny+2)*Nx];
-        Point *row_from_above = new Point[Nx];
-        Point *row_from_bellow = new Point[Nx];
         
         double *IHx = new double[2 * local_Ny * pml_size];
         double *IHy = new double[2 * local_Ny * pml_size];
@@ -341,8 +324,6 @@ int main(int argc, char *argv[])
         double *ICHx = new double[2 * local_Ny * pml_size];
         double *ICHy = new double[2 * local_Ny * pml_size];
         double *ICDz = new double[2 * local_Ny * pml_size];
-
-                
 
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
@@ -370,6 +351,20 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
 
             update_H_worker(sim_space, Nx, local_Ny, mux, muy, dx, dy, pml_size, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
+            
+            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
+            above_me+t+(2*iterations), &sim_space[index(local_Ny+1,0,Nx)] , Nx,
+            MPI_POINT, under_me,rank+t+(2*iterations),
+            MPI_COMM_WORLD, &status);
+            
+            MPI_Sendrecv(&sim_space[index(local_Ny,0,Nx)], Nx, MPI_POINT, under_me ,
+            under_me+t+(3*iterations), &sim_space[0], Nx,
+            MPI_POINT, above_me,rank+t+(3*iterations),
+            MPI_COMM_WORLD, &status);
+
+            MPI_Barrier(MPI_COMM_WORLD);
+            
+            
             update_E_worker(sim_space, Nx, local_Ny, ep,dx, dy, dt, pml_size, DzX_coefs, IDz, ICDz); 
             
 //             if (t==90)
@@ -391,8 +386,7 @@ int main(int argc, char *argv[])
         delete mux ;
         delete muy;
         delete sim_space;
-        delete row_from_above;
-        delete row_from_bellow;
+
     }
     
     delete sigma_x;
