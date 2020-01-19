@@ -2,6 +2,7 @@
 #include <soft_source.h>
 #include <PML_boundry.h>
 #include <update_func_PML.h>
+#include <objects.h>
 #include <mpi.h>
 #include <iostream>
 #include <fstream>
@@ -61,7 +62,7 @@ int main(int argc, char *argv[])
     //INITIAL PARAMS:   
     int Nx{200};
     int Ny{200};
-    int iterations{100000};
+    int iterations{1000};
     double lambda_min{200e-9};
     
     double dx {lambda_min / 20}; // 10 points per half wavelength
@@ -74,10 +75,10 @@ int main(int argc, char *argv[])
     double source_sigma{10*dt};
     double t0 {6 * source_sigma};
     
-    int frames_to_save{300};
+    int frames_to_save{500};
     int which_frame{0};
     int num_frame[frames_to_save];
-    for(int i=0;i<300;++i)
+    for(int i=0;i<frames_to_save;++i)
     {
         num_frame[i] = i * iterations/frames_to_save;
     }
@@ -149,10 +150,27 @@ int main(int argc, char *argv[])
     
     
     int source_position_x {Nx/2};
-    int source_position_y {Ny/2};
-    int rank_source =rank_index_y(Ny/2, Ny, sizes, size);
+    int source_position_y {Ny/5 + 10};
+    int rank_source =rank_index_y(source_position_y, Ny, sizes, size);
+    
+    int center_x {Nx / 2};
+    int center_y {(Ny / 2)};
+    int radius_fo_curvature{Ny /4 }; // why not...
+    int width{Ny /3};
+    
+    double *global_ep = new double[Nx*Ny];
+    lense_foc(global_ep,Nx,Ny,center_x, center_y, radius_fo_curvature, width);
+    
+    std::fstream fs1;
+    fs1.open("data/epmap.txt", std::fstream::in | std::fstream::out | std::fstream::trunc);
 
+    for (int i=0; i<Nx*Ny; ++i)
+    {
+        fs1 << global_ep[i] << '\n';
+    }
+    fs1.close();
 
+    
     
     double * sigma_x = new double[pml_size];
     double *sigma_y = new double[pml_size];
@@ -186,7 +204,7 @@ int main(int argc, char *argv[])
         {
             for (int j=0; j<Nx; ++j)
             {
-                ep[index(i,j,Nx)] = 1.0;
+                ep[index(i,j,Nx)] = global_ep[index(i,j,Nx)];
                 mux[index(i,j,Nx)] = 1;
                 muy[index(i,j,Nx)] = 1;
             }
@@ -244,11 +262,12 @@ int main(int argc, char *argv[])
         delete sim_space;
 
         std::fstream fs;
-        fs.open("info.csv", std::fstream::in | std::fstream::out | std::fstream::trunc);
+        fs.open("data/info.csv", std::fstream::in | std::fstream::out | std::fstream::trunc);
         fs << "Nx,"<<Nx<<'\n'
         << "Ny,"<<Ny<<'\n'
         << "Frames_saved,"<<frames_to_save<<'\n'
-        << "Ranks,"<<size<<'\n';
+        << "Ranks,"<<size<<'\n'
+        << "PML_size,"<< pml_size << '\n';
         
         for(int i=0; i<size; ++i)
         {
@@ -280,7 +299,7 @@ int main(int argc, char *argv[])
         {
             for (int j=0; j<Nx; ++j)
             {
-                ep[index(i,j,Nx)] = 1.0;
+                ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
                 mux[index(i,j,Nx)] = 1;
                 muy[index(i,j,Nx)] = 1;
             }
@@ -362,7 +381,7 @@ int main(int argc, char *argv[])
         {
             for (int i=0; i<sizes[rank]; ++i)
             {
-                ep[index(i,j,Nx)] = 1.0;
+                ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
                 mux[index(i,j,Nx)] = c * dt;
                 muy[index(i,j,Nx)] = c * dt;
             }
@@ -390,8 +409,13 @@ int main(int argc, char *argv[])
 
         for (int t=1; t<iterations; ++t)
         {    
-            sim_space[index(sizes[rank] / 2,source_position_x, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(sizes[rank] / 2,source_position_x, Nx)].InjectDz(sourceE[t]);
+            for (int x=0; x<Nx ; ++x)
+            {
+            sim_space[index(sizes[rank] / 2, x, Nx)].InjectEz(sourceE[t]);
+            sim_space[index(sizes[rank] / 2, x, Nx)].InjectDz(sourceE[t]);
+            }
+//             sim_space[index(sizes[rank] / 2, Nx/2, Nx)].InjectEz(sourceE[t]);
+//             sim_space[index(sizes[rank] / 2, Nx/2, Nx)].InjectDz(sourceE[t]);
 
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
             above_me+t, &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
@@ -470,7 +494,7 @@ int main(int argc, char *argv[])
         {
             for (int j=0; j<Nx; ++j)
             {
-                ep[index(i,j,Nx)] = 1.0;
+                ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
                 mux[index(i,j,Nx)] = 1;
                 muy[index(i,j,Nx)] = 1;
             }
@@ -555,7 +579,7 @@ int main(int argc, char *argv[])
         {
             for (int j=0; j<Nx; ++j)
             {
-                ep[index(i,j,Nx)] = 1.0;
+                ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
                 mux[index(i,j,Nx)] = 1;
                 muy[index(i,j,Nx)] = 1;
             }
@@ -639,7 +663,7 @@ int main(int argc, char *argv[])
         {
             for (int i=0; i<sizes[rank]; ++i)
             {
-                ep[index(i,j,Nx)] = 1.0;
+                ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
                 mux[index(i,j,Nx)] = c * dt;
                 muy[index(i,j,Nx)] = c * dt;
             }
@@ -711,6 +735,7 @@ int main(int argc, char *argv[])
     delete HxX_coefs;
     delete HyX_coefs;
     delete DzX_coefs;
+    delete global_ep;
     
     MPI_Finalize();    
     return 0;
