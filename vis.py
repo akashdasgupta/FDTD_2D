@@ -4,12 +4,16 @@
 Created on Fri Jan 17 14:21:11 2020
 @author: akash
 """
+import matplotlib
+matplotlib.use('Qt4Agg')
+
 
 import numpy as np
 import csv
 from matplotlib import pyplot as plt
 import matplotlib.animation as animation
 import scipy.spatial as sp
+
 
 def indexer(index, Nx, Ny):
     base = Nx * Ny
@@ -51,6 +55,16 @@ for i in range(image.shape[0]):
             points.append((j,i))
 points = np.array(points)
 hull = sp.ConvexHull(points)
+
+# inner = [(params['PML_size'],params['PML_size']),
+#          (params['Nx']-params['PML_size'],params['PML_size']), 
+#          (params['Nx']-params['PML_size'],params['Ny']-params['PML_size']), 
+#          (params['PML_size'],params['Ny']-params['PML_size'])]
+
+# outer = [(0,0), 
+#          (params['Nx'],0), 
+#          (params['Nx'],params['Ny']), 
+#          (0,params['Ny'])]
 
 sizes = [params['RANK '+str(i)+ ' size'] for i in range(params['Ranks'])]
 
