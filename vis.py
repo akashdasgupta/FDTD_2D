@@ -4,8 +4,8 @@
 Created on Fri Jan 17 14:21:11 2020
 @author: akash
 """
-import matplotlib
-matplotlib.use('Qt4Agg')
+# import matplotlib
+# matplotlib.use('Qt4Agg')
 
 
 import numpy as np
@@ -41,30 +41,30 @@ with open (data_dir+"epmap.txt", 'r') as file:
     for row in reader:
         ep_holder.append(float(row[0]))
         
-image = np.zeros((params['Ny'],params['Nx']))
+ep_image = np.zeros((params['Ny'],params['Nx']))
 
 for k, element in enumerate(ep_holder):
     t,i,j = indexer(k,params['Ny'],params['Nx'])
-    image[i,j] = element
+    ep_image[i,j] = element
 
 points= []
 
-for i in range(image.shape[0]):
-    for j in range(image.shape[1]):
-        if image[i-1,j] != image[i,j]:
+for i in range(ep_image.shape[0]):
+    for j in range(ep_image.shape[1]):
+        if ep_image[i-1,j] != ep_image[i,j]:
             points.append((j,i))
 points = np.array(points)
 hull = sp.ConvexHull(points)
 
-# inner = [(params['PML_size'],params['PML_size']),
-#          (params['Nx']-params['PML_size'],params['PML_size']), 
-#          (params['Nx']-params['PML_size'],params['Ny']-params['PML_size']), 
-#          (params['PML_size'],params['Ny']-params['PML_size'])]
+inner = [(params['PML_size'],params['PML_size']),
+         (params['Nx']-params['PML_size'],params['PML_size']), 
+         (params['Nx']-params['PML_size'],params['Ny']-params['PML_size']), 
+         (params['PML_size'],params['Ny']-params['PML_size'])]
 
-# outer = [(0,0), 
-#          (params['Nx'],0), 
-#          (params['Nx'],params['Ny']), 
-#          (0,params['Ny'])]
+outer = [(0,0), 
+         (params['Nx'],0), 
+         (params['Nx'],params['Ny']), 
+         (0,params['Ny'])]
 
 sizes = [params['RANK '+str(i)+ ' size'] for i in range(params['Ranks'])]
 
@@ -80,7 +80,9 @@ for data_file_number in range(params['Ranks']):
     global_i += sizes[data_file_number]
 
 fig = plt.figure()
-im=plt.imshow(data[0], vmin=-0.07, vmax=0.07, cmap='jet', interpolation='none')
+scale = 3
+im=plt.imshow(data[0], vmin=-scale, vmax=scale, cmap='jet', interpolation='none')
+
 for simplex in hull.simplices:
     plt.plot(points[simplex, 0], points[simplex, 1], 'k-')
 
@@ -95,7 +97,7 @@ anim = animation.FuncAnimation( fig,
                                 interval = 1000 / 30, # in ms
                                 )
 
-anim.save('test_anim.mp4', fps=30, extra_args=['-vcodec', 'libx264'], dpi=300)
+anim.save('test_anim.mp4', fps=15, extra_args=['-vcodec', 'libx264'], dpi=300)
 
 
 
