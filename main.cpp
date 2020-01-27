@@ -178,6 +178,7 @@ int main(int argc, char *argv[])
     
     if (rank == 0)
     {
+        double start_time = MPI_Wtime()
         // creates local simulation space, with extra row above_me
         // and bellow for data from other ranks to be pushed into
         Point *sim_space = new Point[(sizes[rank]+2)*Nx];
@@ -241,6 +242,7 @@ int main(int argc, char *argv[])
 
         }
         
+        double endtime = MPI_Wtime()
         
         //save file with object map:
         std::fstream fs1;
@@ -260,7 +262,8 @@ int main(int argc, char *argv[])
            << "Ranks,"           << size<<'\n'
            << "PML_size,"        << pml_size << '\n'
            << "Iterations,"      << iterations<<'\n'
-           << "size,"            << Nx<<'\n';
+           << "size,"            << Nx<<'\n'
+           << "Time taken (s),"  <<start_time-endtime << '\n';
         
         for(int i=0; i<size; ++i)
         {
@@ -411,17 +414,18 @@ int main(int argc, char *argv[])
         double *sourceE = new double[iterations];
         double *sourceHx = new double[iterations];
         double *sourceHy = new double[iterations];
-        inject_soft_source2(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
+        inject_soft_source(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
 
         for (int t=1; t<iterations; ++t)
         {    
-            for (int x=pml_size; x<Nx-pml_size ; ++x)
-            {
-            sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectDz(sourceE[t]);
-            }
-//             sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectEz(sourceE[t]);
-//             sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectDz(sourceE[t]);
+
+//             for (int x=pml_size; x<Nx-pml_size ; ++x)
+//             {
+//             sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectEz(sourceE[t]);
+//             sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectDz(sourceE[t]);
+//             }
+            sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectEz(sourceE[t]);
+            sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectDz(sourceE[t]);
 
 
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
@@ -437,6 +441,7 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
 
             update_H_bulk(sim_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, Hx_coefs, Hy_coefs, ICHx, ICHy);
+
             
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
             above_me+t+(2*iterations), &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
@@ -452,18 +457,14 @@ int main(int argc, char *argv[])
             
             
             update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
-/*            
-            for (int x=pml_size; x<Nx-pml_size ; ++x)
-            {
-            sim_space[index(source_position_y-c_sizes[rank-1], x, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(source_position_y-c_sizes[rank-1], x, Nx)].InjectDz(sourceE[t]);
-            }
-        */
+            
             if(t == num_frame[which_frame])
-            {            
+            {
             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-            which_frame+=1;
+            which_frame += 1;
             }
+
+            
         }
         
         delete sim_space;
