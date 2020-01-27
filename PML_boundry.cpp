@@ -1,12 +1,11 @@
 #include <PML_boundry.h>
+#include <core_funcs.h>
 #include <iostream>
 #include <cmath>
 
 
 double epsilon_naught{8.8541878128e-12};
 double c{299792458};
-
-int index(int i,int j, int Nx){return ((i*Nx) + j);}
 
 void sigma_setter(double sigma_x[], double sigma_y[], int pml_size, double dt)
 {
