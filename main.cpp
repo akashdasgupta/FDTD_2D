@@ -3,90 +3,112 @@
 #include <PML_boundry.h>
 #include <update_func_PML.h>
 #include <objects.h>
+#include<core_funcs.h>
 #include <mpi.h>
 #include <iostream>
 #include <fstream>
 #include <string>
 #include<stdio.h>
 
-void SaveToFile(int size, Point row[], std::string name)
-{
-    std::fstream fs;
-    fs.open(name, std::fstream::in | std::fstream::out | std::fstream::app);
-    for(int i; i<size; ++i)
-    {
-        fs << row[i];
-    }
-
-}
-
-int rank_index_y(int i, int Ny, int *sizes, int rank_size)
-{
-    int rank_occuring {}; // [rank, Ny]
-    for(int k=0; k<rank_size; ++k)
-    {
-        if (i-(sizes[k]-1) > 0)
-        {
-            i -= sizes[k]-1; 
-        }
-        else
-        {
-            rank_occuring = k;
-            break;
-        }
-    }
-    return rank_occuring;
-}
+// #define PLANEWAVE //PLANEWAVE or POINTSOURCE
+// #define SAVEFRAMES
 
 int main(int argc, char *argv[])
 {
     // Initilise and find 
-    //how many processes we can play with:
     MPI_Init (&argc, &argv);
     int size{};
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     int rank{};
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
     MPI_Status status{};
-    
-
     //Makes data sendable via MPI:
     MPI_Datatype MPI_POINT;
     MPI_Type_contiguous(4, MPI_DOUBLE, &MPI_POINT); //initilise
     MPI_Type_commit(&MPI_POINT);//activate
     double c{299792458};
     
-    //Data saving folder:
-    std::string savefile_path{"data"};
+////////////////////////////////////////////////////////////////////////////  
     
-    //INITIAL PARAMS:   
-    int Nx{200};
-    int Ny{200};
-    int iterations{1000};
-    double lambda_min{200e-9};
+    //INITIAL PARAMS:                                                     
+    double gridsize        {2.5e-6}; // Just gonna use square grids 
+    double time            {100e-15};
+    double lambda_min      {200e-9};                                            
+    double pml_size_ratio  {10};                                            
+    int pml_ratio          {3};                                                     
+    int frames_to_save     {300};  
     
-    double dx {lambda_min / 20}; // 10 points per half wavelength
+    
+    double source_position[2]  {gridsize/2,gridsize/4.8};// {x,y}
+    int objecttype             {2}; // 1=planar_convex_lens, 2=biconvel lens, 3 = double_slit
+    double object_position[2]  {gridsize/2,3*gridsize/10}; // {x,y}
+    
+    // for lens:
+    double rad_of_curvature   {2e-6};
+    double lens_width         {1.5e-6};
+    // for double slit:
+    double slit_width         {50e-9};
+    double slit_seperation    {500e-9};
+
+////////////////////////////////////////////////////////////////////////////  
+    
+    
+    // Calculated parameters:
+    double dx {lambda_min / 20}; // at least 10 points per half wavelength
     double dy {lambda_min / 20};
     double dt {dx / (2*c)}; // best dispersion to resolution
-    int pml_size{Nx / 5};
-    int pml_ratio{3};
+    int iterations {950};    
+
+    int Nx{gridsize / dx};
+    int Ny{gridsize / dy};
+    int pml_size{Nx / pml_size_ratio};
     
-    // source parameters (TEMP!!!!!!)
-    double source_sigma{10*dt};
-    double t0 {6 * source_sigma};
+    // Creating the object:
+    int center_x {object_position[0]/dx};
+    int center_y {object_position[1]/dy};
+    int radius_of_curvature_pix{rad_of_curvature/dx}; 
+    int slit_seperation_pix{slit_seperation/dx};
+    int width{};
     
-    int frames_to_save{500};
+    // makes an array with permitivity
+    // each process chops from this 
+    double *global_ep = new double[Nx*Ny];
+    if (objecttype == 1)
+    {
+        width = lens_width / dx;
+        lense_foc(global_ep,Nx,Ny,center_x, center_y, radius_of_curvature_pix, width);
+    }
+    else if (objecttype == 2)
+    {
+        width = lens_width / dx;
+        lense_foc(global_ep,Nx,Ny,center_x, center_y, radius_of_curvature_pix, width);
+    }
+    else
+    {
+        width = slit_width / dx;
+        double_slit(global_ep,Nx,Ny, center_y, center_x,slit_seperation_pix,width);
+    }
+    
+
+    // creates graded sigma profile for PML boundry:
+    double * sigma_x = new double[pml_size];
+    double *sigma_y = new double[pml_size];
+    sigma_setter(sigma_x,sigma_y, pml_size,dt);
+        
+    
+    // for saving of frames: 
+    int frame_interval = (frames_to_save + iterations - (iterations%frames_to_save))/frames_to_save;
+    
     int which_frame{0};
     int num_frame[frames_to_save];
-    for(int i=0;i<frames_to_save;++i)
+    for(int i=0;i<frames_to_save+1;++i)
     {
-        num_frame[i] = i * iterations/frames_to_save;
+        num_frame[i] = i * frame_interval;
     }
-    num_frame[0] = 1;
+    num_frame[0] = 1; // 0th iteration is a bit useless
+    
    
-    
-//     int Ny_size_list[size]{};
-    
+    // Logic to figure out how to split grid between jobs: 
     double density_pml = static_cast<double>(pml_ratio) 
                             * static_cast<double>(size) 
                             / (static_cast<double>(Ny) - ((1-static_cast<double>(pml_ratio)) 
@@ -105,8 +127,8 @@ int main(int argc, char *argv[])
     int worker_Ny_remainder = (Ny-(2*pml_size)) % n_bulk;
     
 
-    int sizes[size]{};
-    int c_sizes[size]{};
+    int sizes[size]{}; // sizes of each rank
+    int c_sizes[size]{}; // cumilative sizes 
     
     for(int i=0; i<n_pml; i++)
     {
@@ -142,89 +164,55 @@ int main(int argc, char *argv[])
         }
     }
     
+    // cumilative sizes: 
     c_sizes[0] = sizes[0];
     for(int i=1; i<size; ++i)
     {
-        c_sizes[i] = sizes[i] + c_sizes[i-1];
+        c_sizes[i] = sizes[i] + c_sizes[i-1]; // pupulates cumilative size recursively
     }
     
-    
-    int source_position_x {Nx/2};
-    int source_position_y {Ny/5 + 10};
+    int source_position_x {source_position[0]/dx};
+    int source_position_y {source_position[1]/dy};
     int rank_source =rank_index_y(source_position_y, Ny, sizes, size);
-    
-    int center_x {Nx / 2};
-    int center_y {(Ny / 2)};
-    int radius_fo_curvature{Ny /4 }; // why not...
-    int width{Ny /3};
-    
-    double *global_ep = new double[Nx*Ny];
-    lense_foc(global_ep,Nx,Ny,center_x, center_y, radius_fo_curvature, width);
-    
-    std::fstream fs1;
-    fs1.open("data/epmap.txt", std::fstream::in | std::fstream::out | std::fstream::trunc);
-
-    for (int i=0; i<Nx*Ny; ++i)
-    {
-        fs1 << global_ep[i] << '\n';
-    }
-    fs1.close();
 
     
-    
-    double * sigma_x = new double[pml_size];
-    double *sigma_y = new double[pml_size];
-    sigma_setter(sigma_x,sigma_y, pml_size,dt);
-    
-    PML_coefs *HxX_coefs = new PML_coefs[pml_size];
-    PML_coefs *HyX_coefs = new PML_coefs[pml_size];
-    PML_coefs *DzX_coefs = new PML_coefs[pml_size];
-    
-    param_setter_x(HxX_coefs, HyX_coefs, DzX_coefs,sigma_x, 1, 1, dt, pml_size);
-    
-
     if (rank == 0)
     {
+        // creates local simulation space, with extra row above_me
+        // and bellow for data from other ranks to be pushed into
+        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
         
+        // creates conductivity profile for PML
         double *local_sigma_y = new double[sizes[rank]];
         for (int i=0; i<sizes[rank]; i++)
         {
             local_sigma_y[i] = sigma_x[pml_size-(i+1)];
-            std::cout << "RANK: "<< rank  << " I tried to access element " << pml_size-(i+1) << '\n';
         }
         
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
-
+        // Chops out part of permitivity grid relavant to itself:
         double *ep = new double[sizes[rank]*Nx];
-        double *mux = new double[sizes[rank]*Nx];
-        double *muy = new double[sizes[rank]*Nx];
-
-
-        for (int i=0; i<sizes[rank]; ++i)
+        for (int j=0; j<Nx; ++j)
         {
-            for (int j=0; j<Nx; ++j)
+            for (int i=0; i<sizes[rank]; ++i)
             {
-                ep[index(i,j,Nx)] = global_ep[index(i,j,Nx)];
-                mux[index(i,j,Nx)] = 1;
-                muy[index(i,j,Nx)] = 1;
+                ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
             }
         }
-        
-        PML_coefs *HxY_coefs = new PML_coefs[sizes[rank]*Nx];
-        PML_coefs *HyY_coefs = new PML_coefs[sizes[rank]*Nx];
-        PML_coefs *DzY_coefs = new PML_coefs[sizes[rank]*Nx];
-        param_setter(HxY_coefs,HyY_coefs,DzY_coefs,sigma_x, local_sigma_y,1,1,dt,pml_size,sizes[rank], Nx);
 
+
+        // coficient matrix (taking into account ep, mu and pml:
+        PML_coefs *Hx_coefs = new PML_coefs[sizes[rank]*Nx];
+        PML_coefs *Hy_coefs = new PML_coefs[sizes[rank]*Nx];
+        PML_coefs *Dz_coefs = new PML_coefs[sizes[rank]*Nx];
+        param_setter(Hx_coefs,Hy_coefs,Dz_coefs,sigma_x, local_sigma_y,1,1,dt,pml_size,sizes[rank], Nx);
         
+        // Holds integrated values:
         double *IDz = new double[Nx * sizes[rank]];
         double *ICHx = new double[Nx * sizes[rank]];
         double *ICHy = new double[Nx * sizes[rank]];
         
-
-        int above_me{(rank-1)%size};
+        // which ranks to communicate with:
         int under_me{(rank+1)%size};
-
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << " I think my y size is :  " <<sizes[rank] << '\n';
 
         for (int t=1; t<iterations; ++t)
         {   
@@ -235,8 +223,7 @@ int main(int argc, char *argv[])
             under_me+t+iterations, MPI_COMM_WORLD);
             MPI_Barrier(MPI_COMM_WORLD);
             
-            update_H_pml(sim_space, Nx, sizes[rank], mux, muy, dx, dy, HxY_coefs, HyY_coefs,ICHx, ICHy);
-            
+            update_H_pml(sim_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
 
             MPI_Recv(&sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
             MPI_POINT, under_me,rank+t+(2*iterations), MPI_COMM_WORLD, &status);
@@ -244,8 +231,7 @@ int main(int argc, char *argv[])
             under_me+t+(3*iterations), MPI_COMM_WORLD);
             MPI_Barrier(MPI_COMM_WORLD);
 
-            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, DzY_coefs,IDz);
-
+            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
             
             if(t == num_frame[which_frame])
             {
@@ -254,20 +240,27 @@ int main(int argc, char *argv[])
             }
 
         }
-
-            
-        delete ep;
-        delete mux ;
-        delete muy;
-        delete sim_space;
-
+        
+        
+        //save file with object map:
+        std::fstream fs1;
+        fs1.open("data/epmap.txt", std::fstream::in | std::fstream::out | std::fstream::trunc);
+        for (int i=0; i<Nx*Ny; ++i)
+        {
+            fs1 << global_ep[i] << '\n';
+        }
+        fs1.close();
+        
+        // saves information on simulation parameters:
         std::fstream fs;
         fs.open("data/info.csv", std::fstream::in | std::fstream::out | std::fstream::trunc);
-        fs << "Nx,"<<Nx<<'\n'
-        << "Ny,"<<Ny<<'\n'
-        << "Frames_saved,"<<frames_to_save<<'\n'
-        << "Ranks,"<<size<<'\n'
-        << "PML_size,"<< pml_size << '\n';
+        fs << "Nx,"              << Nx<<'\n'
+           << "Ny,"              << Ny<<'\n'
+           << "Frames_saved,"    << frames_to_save<<'\n'
+           << "Ranks,"           << size<<'\n'
+           << "PML_size,"        << pml_size << '\n'
+           << "Iterations,"      << iterations<<'\n'
+           << "size,"            << Nx<<'\n';
         
         for(int i=0; i<size; ++i)
         {
@@ -275,50 +268,55 @@ int main(int argc, char *argv[])
         }
         fs.close();
 
+        delete sim_space;
+        delete local_sigma_y;
+        delete ep;
+        delete Hx_coefs;
+        delete Hy_coefs;
+        delete Dz_coefs;
+        delete IDz;
+        delete ICHx;
+        delete ICHy;
 
 
     }
     else if (rank < n_pml)
     {
+        // creates local simulation space, with extra row above_me
+        // and bellow for data from other ranks to be pushed into
+        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        
+        // PML conductivity:
         double *local_sigma_y = new double[sizes[rank]];
         for (int i=0; i<sizes[rank]; i++)
         {
             local_sigma_y[i] = sigma_x[pml_size-(i+c_sizes[rank-1]+1)];
-            std::cout << "RANK: "<< rank  << " Sigma is " << local_sigma_y[i] << '\n';
-
         }
         
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
-
+        // Chops out part of permitivity grid relavant to itself:
         double *ep = new double[sizes[rank]*Nx];
-        double *mux = new double[sizes[rank]*Nx];
-        double *muy = new double[sizes[rank]*Nx];
-
-
-        for (int i=0; i<sizes[rank]; ++i)
+        for (int j=0; j<Nx; ++j)
         {
-            for (int j=0; j<Nx; ++j)
+            for (int i=0; i<sizes[rank]; ++i)
             {
                 ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
-                mux[index(i,j,Nx)] = 1;
-                muy[index(i,j,Nx)] = 1;
             }
         }
-        
-        PML_coefs *HxY_coefs = new PML_coefs[sizes[rank]*Nx];
-        PML_coefs *HyY_coefs = new PML_coefs[sizes[rank]*Nx];
-        PML_coefs *DzY_coefs = new PML_coefs[sizes[rank]*Nx];
-        param_setter(HxY_coefs,HyY_coefs,DzY_coefs,sigma_x, local_sigma_y,1,1,dt,pml_size,sizes[rank], Nx);
+                
+        // coficient matrix (taking into account ep, mu and pml:
+        PML_coefs *Hx_coefs = new PML_coefs[sizes[rank]*Nx];
+        PML_coefs *Hy_coefs = new PML_coefs[sizes[rank]*Nx];
+        PML_coefs *Dz_coefs = new PML_coefs[sizes[rank]*Nx];
+        param_setter(Hx_coefs,Hy_coefs,Dz_coefs,sigma_x, local_sigma_y,1,1,dt,pml_size,sizes[rank], Nx);
 
-        
+        // Holds integrated values:
         double *IDz = new double[Nx * sizes[rank]];
         double *ICHx = new double[Nx * sizes[rank]];
         double *ICHy = new double[Nx * sizes[rank]];
         
+        // which ranks to communicate with:
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
-
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << " I think my y size is :  " <<sizes[rank] << '\n';
 
         for (int t=1; t<iterations; ++t)
         {   
@@ -335,7 +333,7 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
             
-            update_H_pml(sim_space, Nx, sizes[rank], mux, muy, dx, dy, HxY_coefs, HyY_coefs,ICHx, ICHy);
+            update_H_pml(sim_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
             
 
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
@@ -350,29 +348,37 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
 
-            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, DzY_coefs,IDz);
+            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
 
-            
             if(t == num_frame[which_frame])
             {
             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
             which_frame += 1;
             }
-
-
         }
 
-            
-            delete ep;
-            delete mux ;
-            delete muy;
-            delete sim_space;
-
+        delete sim_space;
+        delete local_sigma_y;
+        delete ep;
+        delete Hx_coefs;
+        delete Hy_coefs;
+        delete Dz_coefs;
+        delete IDz;
+        delete ICHx;
+        delete ICHy;
     }
     
-    else if (rank == rank_source)
+    else if (rank == rank_source) // asuming source is not literally inside the PML
     {
+        // source parameters: 
+        double source_sigma{10*dt};
+        double t0 {6 * source_sigma};
+        
+        // creates local simulation space, with extra row above_me
+        // and bellow for data from other ranks to be pushed into
         Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        
+        // Chops out part of permitivity grid relavant to itself: 
         double *ep = new double[sizes[rank]*Nx];
         double *mux = new double[sizes[rank]*Nx];
         double *muy = new double[sizes[rank]*Nx];
@@ -387,35 +393,36 @@ int main(int argc, char *argv[])
             }
         }
         
-        double *IHx = new double[2 * sizes[rank] * pml_size];
-        double *IHy = new double[2 * sizes[rank] * pml_size];
-        double *IDz = new double[2 * sizes[rank] * pml_size];
+        PML_coefs *Hx_coefs = new PML_coefs[pml_size];
+        PML_coefs *Hy_coefs = new PML_coefs[pml_size];
+        PML_coefs *Dz_coefs = new PML_coefs[pml_size];
+        param_setter_x(Hx_coefs, Hy_coefs, Dz_coefs,sigma_x, 1, 1, dt, pml_size);
 
+        // Holds integrated values:
+        double *IDz = new double[2 * sizes[rank] * pml_size];
         double *ICHx = new double[2 * sizes[rank] * pml_size];
         double *ICHy = new double[2 * sizes[rank] * pml_size];
-        double *ICDz = new double[2 * sizes[rank] * pml_size];
-
+        
+        // which ranks to communicate with:
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
-
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << " I think my y size is :  " <<sizes[rank] << '\n';
         
+        //creates source array in advanced to save compute
         double *sourceE = new double[iterations];
         double *sourceHx = new double[iterations];
         double *sourceHy = new double[iterations];
         inject_soft_source2(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
-        
-
 
         for (int t=1; t<iterations; ++t)
         {    
-            for (int x=0; x<Nx ; ++x)
+            for (int x=pml_size; x<Nx-pml_size ; ++x)
             {
-            sim_space[index(sizes[rank] / 2, x, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(sizes[rank] / 2, x, Nx)].InjectDz(sourceE[t]);
+            sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectEz(sourceE[t]);
+            sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectDz(sourceE[t]);
             }
-//             sim_space[index(sizes[rank] / 2, Nx/2, Nx)].InjectEz(sourceE[t]);
-//             sim_space[index(sizes[rank] / 2, Nx/2, Nx)].InjectDz(sourceE[t]);
+//             sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectEz(sourceE[t]);
+//             sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectDz(sourceE[t]);
+
 
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
             above_me+t, &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
@@ -429,7 +436,7 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
 
-            update_H_bulk(sim_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
+            update_H_bulk(sim_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, Hx_coefs, Hy_coefs, ICHx, ICHy);
             
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
             above_me+t+(2*iterations), &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
@@ -444,33 +451,47 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
             
             
-            update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, DzX_coefs, IDz, ICDz); 
-        
+            update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
+/*            
+            for (int x=pml_size; x<Nx-pml_size ; ++x)
+            {
+            sim_space[index(source_position_y-c_sizes[rank-1], x, Nx)].InjectEz(sourceE[t]);
+            sim_space[index(source_position_y-c_sizes[rank-1], x, Nx)].InjectDz(sourceE[t]);
+            }
+        */
             if(t == num_frame[which_frame])
             {            
             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
             which_frame+=1;
             }
-
         }
-
-        delete ep;
-        delete mux ;
-        delete muy;
+        
         delete sim_space;
+        delete ep;
+        delete mux;
+        delete muy;
+        delete Hx_coefs;
+        delete Hy_coefs;
+        delete Dz_coefs;
+        delete IDz;
+        delete ICHx;
+        delete ICHy;
+
     }
     
     else if (rank == (size-1))
     {
+        // creates local simulation space, with extra row above_me
+        // and bellow for data from other ranks to be pushed into
+        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        
+        // Creates PML sigma coficients
         double *local_sigma_y = new double[sizes[rank]];
-
         if (rank == size - n_pml)
         {
             for (int i=0; i<sizes[rank]; i++)
             {
                 local_sigma_y[i] = sigma_x[i];
-                std::cout << "RANK: "<< rank  << " I tried to access element " << i << '\n';
-
             }
         }
         
@@ -483,38 +504,29 @@ int main(int argc, char *argv[])
 
         }
         
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
-
+        // Chops out part of permitivity grid relavant to itself:
         double *ep = new double[sizes[rank]*Nx];
-        double *mux = new double[sizes[rank]*Nx];
-        double *muy = new double[sizes[rank]*Nx];
-
-
-        for (int i=0; i<sizes[rank]; ++i)
+        for (int j=0; j<Nx; ++j)
         {
-            for (int j=0; j<Nx; ++j)
+            for (int i=0; i<sizes[rank]; ++i)
             {
                 ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
-                mux[index(i,j,Nx)] = 1;
-                muy[index(i,j,Nx)] = 1;
             }
         }
         
-        PML_coefs *HxY_coefs = new PML_coefs[sizes[rank]*Nx];
-        PML_coefs *HyY_coefs = new PML_coefs[sizes[rank]*Nx];
-        PML_coefs *DzY_coefs = new PML_coefs[sizes[rank]*Nx];
-        param_setter(HxY_coefs,HyY_coefs,DzY_coefs,sigma_x, local_sigma_y,1,1,dt,pml_size,sizes[rank], Nx);
+        PML_coefs *Hx_coefs = new PML_coefs[sizes[rank]*Nx];
+        PML_coefs *Hy_coefs = new PML_coefs[sizes[rank]*Nx];
+        PML_coefs *Dz_coefs = new PML_coefs[sizes[rank]*Nx];
+        param_setter(Hx_coefs,Hy_coefs,Dz_coefs,sigma_x, local_sigma_y,1,1,dt,pml_size,sizes[rank], Nx);
 
-        
+        // Holds integrated values:
         double *IDz = new double[Nx * sizes[rank]];
         double *ICHx = new double[Nx * sizes[rank]];
         double *ICHy = new double[Nx * sizes[rank]];
         
-
+        // which ranks to communicate with:
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
-
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << " I think my y size is :  " <<sizes[rank] << '\n';
 
         for (int t=1; t<iterations; ++t)
         {   
@@ -525,7 +537,7 @@ int main(int argc, char *argv[])
             MPI_COMM_WORLD, &status);
             MPI_Barrier(MPI_COMM_WORLD);
             
-            update_H_pml(sim_space, Nx, sizes[rank], mux, muy, dx, dy, HxY_coefs, HyY_coefs,ICHx, ICHy);
+            update_H_pml(sim_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
             
 
             MPI_Send(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
@@ -537,7 +549,7 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
 
-            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, DzY_coefs,IDz);
+            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
 
             
             if(t == num_frame[which_frame])
@@ -546,12 +558,26 @@ int main(int argc, char *argv[])
             which_frame += 1;
             }
         }
+        delete sim_space;
+        delete local_sigma_y;
+        delete ep;
+        delete Hx_coefs;
+        delete Hy_coefs;
+        delete Dz_coefs;
+        delete IDz;
+        delete ICHx;
+        delete ICHy;
+
     }
     
     else if (rank >= (size - n_pml))
     {
-        double *local_sigma_y = new double[sizes[rank]];
+        // creates local simulation space, with extra row above_me
+        // and bellow for data from other ranks to be pushed into
+        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
 
+        // Creates PML sigma coficients
+        double *local_sigma_y = new double[sizes[rank]];
         if (rank == size - n_pml)
         {
             for (int i=0; i<sizes[rank]; i++)
@@ -568,38 +594,30 @@ int main(int argc, char *argv[])
             }
         }
         
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
-
+        // Chops out part of permitivity grid relavant to itself:
         double *ep = new double[sizes[rank]*Nx];
-        double *mux = new double[sizes[rank]*Nx];
-        double *muy = new double[sizes[rank]*Nx];
-
-
-        for (int i=0; i<sizes[rank]; ++i)
+        for (int j=0; j<Nx; ++j)
         {
-            for (int j=0; j<Nx; ++j)
+            for (int i=0; i<sizes[rank]; ++i)
             {
                 ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
-                mux[index(i,j,Nx)] = 1;
-                muy[index(i,j,Nx)] = 1;
             }
         }
-        
-        PML_coefs *HxY_coefs = new PML_coefs[sizes[rank]*Nx];
-        PML_coefs *HyY_coefs = new PML_coefs[sizes[rank]*Nx];
-        PML_coefs *DzY_coefs = new PML_coefs[sizes[rank]*Nx];
-        param_setter(HxY_coefs,HyY_coefs,DzY_coefs,sigma_x, local_sigma_y,1,1,dt,pml_size,sizes[rank], Nx);
 
-        
+        // coficient matrix (taking into account ep, mu and pml:
+        PML_coefs *Hx_coefs = new PML_coefs[sizes[rank]*Nx];
+        PML_coefs *Hy_coefs = new PML_coefs[sizes[rank]*Nx];
+        PML_coefs *Dz_coefs = new PML_coefs[sizes[rank]*Nx];
+        param_setter(Hx_coefs,Hy_coefs,Dz_coefs,sigma_x, local_sigma_y,1,1,dt,pml_size,sizes[rank], Nx);
+
+        // Holds integrated values:
         double *IDz = new double[Nx * sizes[rank]];
         double *ICHx = new double[Nx * sizes[rank]];
         double *ICHy = new double[Nx * sizes[rank]];
         
-
+        // which ranks to communicate with:
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
-
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << " I think my y size is :  " <<sizes[rank] << '\n';
 
         for (int t=1; t<iterations; ++t)
         {   
@@ -616,7 +634,7 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
             
-            update_H_pml(sim_space, Nx, sizes[rank], mux, muy, dx, dy, HxY_coefs, HyY_coefs,ICHx, ICHy);
+            update_H_pml(sim_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
             
 
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
@@ -631,7 +649,7 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
 
-            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, DzY_coefs,IDz);
+            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
 
             
             if(t == num_frame[which_frame])
@@ -639,22 +657,25 @@ int main(int argc, char *argv[])
             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
             which_frame += 1;
             }
-
-
         }
-
-            
-            delete ep;
-            delete mux ;
-            delete muy;
-            delete sim_space;
-
-        
+    delete sim_space;
+    delete local_sigma_y;
+    delete ep;
+    delete Hx_coefs;
+    delete Hy_coefs;
+    delete Dz_coefs;
+    delete IDz;
+    delete ICHx;
+    delete ICHy;
     }
 
     else
     {
+        // creates local simulation space, with extra row above_me
+        // and bellow for data from other ranks to be pushed into
         Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        
+        // Chops out part of permitivity grid relavant to itself:
         double *ep = new double[sizes[rank]*Nx];
         double *mux = new double[sizes[rank]*Nx];
         double *muy = new double[sizes[rank]*Nx];
@@ -669,18 +690,20 @@ int main(int argc, char *argv[])
             }
         }
         
-        double *IHx = new double[2 * sizes[rank] * pml_size];
-        double *IHy = new double[2 * sizes[rank] * pml_size];
-        double *IDz = new double[2 * sizes[rank] * pml_size];
+        // coficient matrix (taking into account ep, mu and pml:
+        PML_coefs *Hx_coefs = new PML_coefs[pml_size];
+        PML_coefs *Hy_coefs = new PML_coefs[pml_size];
+        PML_coefs *Dz_coefs = new PML_coefs[pml_size];
+        param_setter_x(Hx_coefs, Hy_coefs, Dz_coefs,sigma_x, 1, 1, dt, pml_size);
 
+        // Holds integrated values:
+        double *IDz = new double[2 * sizes[rank] * pml_size];
         double *ICHx = new double[2 * sizes[rank] * pml_size];
         double *ICHy = new double[2 * sizes[rank] * pml_size];
-        double *ICDz = new double[2 * sizes[rank] * pml_size];
 
+        // which ranks to communicate with:
         int above_me{(rank-1)%size};
         int under_me{(rank+1)%size};
-
-        std::cout << "RANK: "<< rank << " ABOVE ME: "<< above_me << " UNDER ME: " << under_me << " I think my y size is :  " <<sizes[rank] << '\n';
 
 
         for (int t=1; t<iterations; ++t)
@@ -698,7 +721,7 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
 
-            update_H_bulk(sim_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, HxX_coefs, HyX_coefs, IHx, IHy,ICHx, ICHy);
+            update_H_bulk(sim_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, Hx_coefs, Hy_coefs, ICHx, ICHy);
             
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
             above_me+t+(2*iterations), &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
@@ -713,7 +736,7 @@ int main(int argc, char *argv[])
             MPI_Barrier(MPI_COMM_WORLD);
             
             
-            update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, DzX_coefs, IDz, ICDz); 
+            update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
         
             if(t == num_frame[which_frame])
             {            
@@ -722,19 +745,20 @@ int main(int argc, char *argv[])
             }
 
         }
-
-        delete ep;
-        delete mux ;
-        delete muy;
         delete sim_space;
-  
+        delete ep;
+        delete mux;
+        delete muy;
+        delete Hx_coefs;
+        delete Hy_coefs;
+        delete Dz_coefs;
+        delete IDz;
+        delete ICHx;
+        delete ICHy;
     }
 
     delete sigma_x;
     delete sigma_y;
-    delete HxX_coefs;
-    delete HyX_coefs;
-    delete DzX_coefs;
     delete global_ep;
     
     MPI_Finalize();    
