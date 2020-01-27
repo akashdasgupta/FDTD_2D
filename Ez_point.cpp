@@ -1,4 +1,4 @@
-#include "Ez_point.h"
+#include <Ez_point.h>
 
 std::ostream& operator<< (std::ostream &out, const Point &point)
 {
