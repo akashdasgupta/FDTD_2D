@@ -8,8 +8,8 @@ NAME = a.out
 
 
 $(NAME): $(SRC)
-	@$(CC) -o $(NAME) $(CFLAGS) $(SRC)
+	@$(CC) -o $(NAME) $(CFLAGS) $(SRC) -Wno-narrowing
 
 .PHONY: clean
 clean:
-	@rm -f $(NAME) data/* runfile.* 
+	@rm -f $(NAME) data/* runfile.* movie_runfile.* *.mp4
