@@ -2,6 +2,7 @@
 #include <PML_boundry.h>
 #include <core_funcs.h>
 #include <iostream>
+// #pragma omp parallel default(none) num_threads(4)
 
 /*
 * Updates magnetic field on all points of simulation space, for region within the 'top' PML 
@@ -24,7 +25,8 @@ void update_H_pml(Point space[], int Nx, int Ny, double dx, double dy, PML_coefs
     double new_Hy{};
     
     for (int i=0; i<Ny; ++i)
-    {
+    {    
+
         for (int j=0; j<Nx-1; ++j)
         {
             CEx = (space[index(i+2,j,Nx)].GetEz() - space[index(i+1,j,Nx)].GetEz()) / dy;
@@ -90,7 +92,6 @@ void update_E_pml(Point space[], int Nx, int Ny, double ep[], double dx, double 
     double CHz{};
     double new_Dz{};
     double c{299792458};
-
 
     for (int i=0; i<Ny; ++i)
     {
