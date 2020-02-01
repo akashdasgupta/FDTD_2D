@@ -67,6 +67,8 @@ void double_slit(double ep[], int Nx, int Ny, int height, int center_x, int slit
         }
     }
     
+    std::cout <<height << " , " << boundry_1 << " , " <<boundry_2 << " , " <<boundry_3 << " , " <<boundry_4 << '\n';
+    
     for (int j = 0; j<boundry_1; ++j)
     {
         ep[index(height,j,Nx)] = 1e20;
