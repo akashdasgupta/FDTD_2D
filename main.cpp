@@ -2,18 +2,21 @@
 #include <PML_boundry.h>
 #include <update_func_PML.h>
 #include <objects.h>
-#include<core_funcs.h>
+#include <core_funcs.h>
 #include <mpi.h>
 #include <iostream>
 #include <fstream>
 #include <string>
-#include<stdio.h>
+#include <stdio.h>
+#include <cstdlib>
+// #include <omp.h>
 
 // Some initial params are preprocessor: 
 
 #define PLANEWAVE   //PLANEWAVE or POINTSOURCE
 #define CW          // PULSED or CW
-#define SAVEFRAMES
+//#define SAVEFRAMES
+# define ALL_IO_OFF
 
 int main(int argc, char *argv[])
 {
@@ -25,7 +28,7 @@ int main(int argc, char *argv[])
     MPI_Status status{};
     double c{299792458};
     
-    std::cout << "I entered: " << argv[1] << '\n';
+//     omp_set_num_threads(atoi(argv[1]));
     
 ////////////////////////////////////////////////////////////////////////////  
     
@@ -260,6 +263,7 @@ int main(int argc, char *argv[])
         
         double endtime = MPI_Wtime();
         
+        # ifndef ALL_IO_OFF
         //save file with object map:
         std::fstream fs1;
         fs1.open("data/epmap.txt", std::fstream::in | std::fstream::out | std::fstream::trunc);
@@ -287,7 +291,7 @@ int main(int argc, char *argv[])
             fs << "RANK " << i << " size," << sizes[i] << '\n';
         }
         fs.close();
-        
+        #endif
         std::fstream appender;
         appender.open("times.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
         appender << size << "," << endtime - start_time << '\n';
