@@ -1,5 +1,4 @@
 #include <core_funcs.h>
-#include <Ez_point.h>
 #include <iostream>
 #include <fstream>
 
@@ -9,13 +8,13 @@
 * @param row array to save
 * @param name save to name / savefile_path
 */
-void SaveToFile(int size, Point row[], std::string name)
+void SaveToFile(int size, double Ez[], double Hx[], double Hy[], std::string name)
 {
     std::fstream fs;
     fs.open(name, std::fstream::in | std::fstream::out | std::fstream::app);
     for(int i; i<size; ++i)
     {
-        fs << row[i];
+        fs << Ez[i] << "," << Hx[i] << "," << Hy[i] << "," << std::endl;
     }
 }
 
