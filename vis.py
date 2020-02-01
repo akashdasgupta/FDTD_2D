@@ -83,13 +83,13 @@ for data_file_number in range(params['Ranks']):
     global_i += sizes[data_file_number]
     
     
-#plt.plot([(i-params['Nx']/2)*params[spacestep] for i in range(params['Nx'])],
+#plt.plot([(i-params['Nx']/2)*params['spacestep'] for i in range(params['Nx'])],
          #[i for i in data[-1][stepscale,:]])
 #plt.savefig("graph.png", dpi=600)
 #plt.close('all')
 
 fig = plt.figure()
-scale =0.00025
+scale =2
 sizer = ((params['Nx']/2) * params['spacestep']) / 1e-6
 
 im=plt.imshow(data[0], vmin=-scale, vmax=scale, cmap='jet', interpolation='none', extent=[-sizer,sizer,-sizer,sizer])
@@ -102,8 +102,8 @@ plt.tight_layout()
 
 stepscale = params['spacestep'] / 1e-6
 
-#for simplex in hull.simplices:
-    #plt.plot(points[simplex, 0]*stepscale - sizer, -points[simplex, 1]*stepscale + sizer, 'k-')
+for simplex in hull.simplices:
+    plt.plot(points[simplex, 0]*stepscale - sizer, -points[simplex, 1]*stepscale + sizer, 'k-')
 
 screen_position = params['Nx'] / 10 + 10
 
