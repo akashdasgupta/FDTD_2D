@@ -1,7 +1,7 @@
 CC = mpic++
 IDIR = include
 
-CFLAGS = -I $(IDIR) -O3
+CFLAGS = -I $(IDIR) -fopenmp -O3
 
 SRC = $(wildcard *.cpp)
 NAME = a.out
