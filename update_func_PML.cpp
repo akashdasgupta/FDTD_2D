@@ -28,7 +28,7 @@ void update_H_pml(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double 
 
         for (int j=0; j<Nx-1; ++j)
         {
-            CEx = (Ez[index(i+2,j,Nx)] - Ez[index(i+1,j,Nx)])) / dy;
+            CEx = (Ez[index(i+2,j,Nx)] - Ez[index(i+1,j,Nx)]) / dy;
             CEy = -(Ez[index(i+1,j+1,Nx)] - Ez[index(i+1,j,Nx)]) / dx;
             
 
@@ -51,8 +51,8 @@ void update_H_pml(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double 
         // Zero at the right edge (mirror like)
         {
             int j{Nx-1};
-            CEx = (Ez[index(i+2,j,Nx)].GetEz() - Ez[index(i+1,j,Nx)].GetEz()) / dy;
-            CEy = -(0 - Ez[index(i+1,j,Nx)].GetEz()) / dx;
+            CEx = (Ez[index(i+2,j,Nx)] - Ez[index(i+1,j,Nx)]) / dy;
+            CEy = -(0 - Ez[index(i+1,j,Nx)]) / dx;
             
 
             ICHx[index(i,j,Nx)] +=CEx;
@@ -86,7 +86,7 @@ void update_H_pml(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double 
 * @param[out] IDz integrals for Dz (same dimentions as sim space) 
 */
 
-void update_E_pml(double Dz[], double Ez[], double Hx[], double Hy[], int Nx, int Ny, double ep[], double dx, double dy, double dt, PML_coefs coefs_Dz[], double IDz[])
+void update_E_pml(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, int Ny, double ep[], double dx, double dy, double dt, PML_coefs coefs_Dz[], double IDz[])
 {
     double CHz{};
     double new_Dz{};
@@ -196,13 +196,13 @@ void update_H_bulk(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double
         for (int j=Nx-pml_size; j<Nx-1; ++j)
         {
             CEx = (Ez[index(i+2,j,Nx)] - Ez[index(i+1,j,Nx)]) / dy;
-            CEy = -(Ez[index(i+1,j+1,Nx)].GetEz() - Ez[index(i+1,j,Nx)]) / dx;
+            CEy = -(Ez[index(i+1,j+1,Nx)] - Ez[index(i+1,j,Nx)]) / dx;
             
             ICHx[index(i+Ny,j-Nx+pml_size,pml_size)] +=CEx;
             ICHy[index(i+Ny,j-Nx+pml_size,pml_size)] +=CEy;
             
             
-            new_Hx = coefs_Hx[j-(Nx-pml_size)].Getm1() * Hz[index(i+1,j,Nx)] 
+            new_Hx = coefs_Hx[j-(Nx-pml_size)].Getm1() * Hx[index(i+1,j,Nx)] 
             + coefs_Hx[j-(Nx-pml_size)].Getm2() * CEx
             + coefs_Hx[j-(Nx-pml_size)].Getm3() * ICHx[index(i+Ny,j-Nx+pml_size,pml_size)];
             
@@ -255,7 +255,7 @@ void update_H_bulk(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double
 * @param[out] IDz integrals for Dz (size of pml size)
 */
 
-void update_E_bulk(double Dz[], double Ez[], double Hx[], double Hy[], int Nx, int Ny, double ep[], double dx, double dy, double dt,int pml_size, PML_coefs coefs_Dz[], double IDz[])
+void update_E_bulk(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, int Ny, double ep[], double dx, double dy, double dt,int pml_size, PML_coefs coefs_Dz[], double IDz[])
 {
     double CHz{};
     double new_Dz{};
@@ -301,14 +301,14 @@ void update_E_bulk(double Dz[], double Ez[], double Hx[], double Hy[], int Nx, i
             CHz = ((Hy[index(i+1,j,Nx)] - Hy[index(i+1,j-1,Nx)]) / dx ) - ((Hx[index(i+1,j,Nx)] - Hx[index(i,j,Nx)]) / dy );
             new_Dz = Dz[index(i+1,j,Nx)] + (c * dt * CHz);
             
-            Dz[index(i+1,j,Nx)] = new_Dz);
+            Dz[index(i+1,j,Nx)] = new_Dz;
             Ez[index(i+1,j,Nx)] = new_Dz / ep[index(i,j,Nx)];
         }
         
         // Right PML: 
         for (int j=Nx-pml_size; j<=Nx-1; ++j)
         {
-            CHz = ((Hy[index(i+1,j,Nx)].GetHy() - Hy[index(i+1,j-1,Nx)].GetHy()) / dx ) - ((Hx[index(i+1,j,Nx)] - Hx[index(i,j,Nx)]) / dy );
+            CHz = ((Hy[index(i+1,j,Nx)] - Hy[index(i+1,j-1,Nx)]) / dx ) - ((Hx[index(i+1,j,Nx)] - Hx[index(i,j,Nx)]) / dy );
             
             IDz[index(i+Ny,j-Nx+pml_size,pml_size)] += Dz[index(i+1,j,Nx)];
 
@@ -319,7 +319,7 @@ void update_E_bulk(double Dz[], double Ez[], double Hx[], double Hy[], int Nx, i
 
 
             Dz[index(i+1,j,Nx)] = new_Dz;
-            Dz[index(i+1,j,Nx)] = new_Dz / ep[index(i,j,Nx)];
+            Ez[index(i+1,j,Nx)] = new_Dz / ep[index(i,j,Nx)];
         }
     }        
 }
