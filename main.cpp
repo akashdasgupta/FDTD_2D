@@ -10,12 +10,14 @@
 #include <string>
 #include<stdio.h>
 
-// #define PLANEWAVE //PLANEWAVE or POINTSOURCE
-// #define SAVEFRAMES
+// Some initial params are preprocessor: 
+
+#define PLANEWAVE   //PLANEWAVE or POINTSOURCE
+#define CW          // PULSED or CW
+#define SAVEFRAMES
 
 int main(int argc, char *argv[])
 {
-    // Initilise and find 
     MPI_Init (&argc, &argv);
     int size{};
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -31,7 +33,7 @@ int main(int argc, char *argv[])
 ////////////////////////////////////////////////////////////////////////////  
     
     //INITIAL PARAMS:                                                     
-    double gridsize        {2.5e-6}; // Just gonna use square grids 
+    double gridsize        {3e-6}; // Just gonna use square grids 
     double time            {100e-15};
     double lambda_min      {200e-9};                                            
     double pml_size_ratio  {10};                                            
@@ -39,9 +41,9 @@ int main(int argc, char *argv[])
     int frames_to_save     {300};  
     
     
-    double source_position[2]  {gridsize/2,gridsize/4.8};// {x,y}
+    double source_position[2]  {gridsize/2,320e-9};// {x,y}
     int objecttype             {2}; // 1=planar_convex_lens, 2=biconvel lens, 3 = double_slit
-    double object_position[2]  {gridsize/2,3*gridsize/10}; // {x,y}
+    double object_position[2]  {gridsize/2,900e-9}; // {x,y}
     
     // for lens:
     double rad_of_curvature   {2e-6};
@@ -57,7 +59,7 @@ int main(int argc, char *argv[])
     double dx {lambda_min / 20}; // at least 10 points per half wavelength
     double dy {lambda_min / 20};
     double dt {dx / (2*c)}; // best dispersion to resolution
-    int iterations {950};    
+    int iterations {100000};    
 
     int Nx{gridsize / dx};
     int Ny{gridsize / dy};
@@ -76,7 +78,7 @@ int main(int argc, char *argv[])
     if (objecttype == 1)
     {
         width = lens_width / dx;
-        lense_foc(global_ep,Nx,Ny,center_x, center_y, radius_of_curvature_pix, width);
+        lense_col(global_ep,Nx,Ny,center_x, center_y, radius_of_curvature_pix, width);
     }
     else if (objecttype == 2)
     {
@@ -234,42 +236,48 @@ int main(int argc, char *argv[])
 
             update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
             
-            if(t == num_frame[which_frame])
-            {
-            SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-            which_frame += 1;
-            }
+//             if(t == num_frame[which_frame])
+//             {
+//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
+//             which_frame += 1;
+//             }
 
         }
         
         double endtime = MPI_Wtime();
         
-        //save file with object map:
-        std::fstream fs1;
-        fs1.open("data/epmap.txt", std::fstream::in | std::fstream::out | std::fstream::trunc);
-        for (int i=0; i<Nx*Ny; ++i)
-        {
-            fs1 << global_ep[i] << '\n';
-        }
-        fs1.close();
+//         //save file with object map:
+//         std::fstream fs1;
+//         fs1.open("data/epmap.txt", std::fstream::in | std::fstream::out | std::fstream::trunc);
+//         for (int i=0; i<Nx*Ny; ++i)
+//         {
+//             fs1 << global_ep[i] << '\n';
+//         }
+//         fs1.close();
+//         
+//         // saves information on simulation parameters:
+//         std::fstream fs;
+//         fs.open("data/info.csv", std::fstream::in | std::fstream::out | std::fstream::trunc);
+//         fs << "Nx,"              << Nx<<'\n'
+//            << "Ny,"              << Ny<<'\n'
+//            << "Frames_saved,"    << which_frame<<'\n'
+//            << "Ranks,"           << size<<'\n'
+//            << "PML_size,"        << pml_size << '\n'
+//            << "Iterations,"      << iterations<<'\n'
+//            << "size,"            << Nx<<'\n'
+//            << "Time taken (s),"  << endtime - start_time << '\n'
+//            << "spacestep,"       << dx << '\n';
+//         
+//         for(int i=0; i<size; ++i)
+//         {
+//             fs << "RANK " << i << " size," << sizes[i] << '\n';
+//         }
+//         fs.close();
         
-        // saves information on simulation parameters:
-        std::fstream fs;
-        fs.open("data/info.csv", std::fstream::in | std::fstream::out | std::fstream::trunc);
-        fs << "Nx,"              << Nx<<'\n'
-           << "Ny,"              << Ny<<'\n'
-           << "Frames_saved,"    << frames_to_save<<'\n'
-           << "Ranks,"           << size<<'\n'
-           << "PML_size,"        << pml_size << '\n'
-           << "Iterations,"      << iterations<<'\n'
-           << "size,"            << Nx<<'\n'
-           << "Time taken (s),"  << endtime - start_time << '\n';
-        
-        for(int i=0; i<size; ++i)
-        {
-            fs << "RANK " << i << " size," << sizes[i] << '\n';
-        }
-        fs.close();
+        std::fstream appender;
+        appender.open("times.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
+        appender << size << "," << endtime - start_time << '\n';
+        appender.close();
 
         delete sim_space;
         delete local_sigma_y;
@@ -353,11 +361,11 @@ int main(int argc, char *argv[])
 
             update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
 
-            if(t == num_frame[which_frame])
-            {
-            SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-            which_frame += 1;
-            }
+//             if(t == num_frame[which_frame])
+//             {
+//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
+//             which_frame += 1;
+//             }
         }
 
         delete sim_space;
@@ -401,6 +409,7 @@ int main(int argc, char *argv[])
         PML_coefs *Dz_coefs = new PML_coefs[pml_size];
         param_setter_x(Hx_coefs, Hy_coefs, Dz_coefs,sigma_x, 1, 1, dt, pml_size);
 
+
         // Holds integrated values:
         double *IDz = new double[2 * sizes[rank] * pml_size];
         double *ICHx = new double[2 * sizes[rank] * pml_size];
@@ -414,19 +423,31 @@ int main(int argc, char *argv[])
         double *sourceE = new double[iterations];
         double *sourceHx = new double[iterations];
         double *sourceHy = new double[iterations];
+        
+        #ifdef CW
+        inject_soft_source2(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
+        #endif
+        
+        #ifdef PULSED
         inject_soft_source(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
+        #endif
+
 
         for (int t=1; t<iterations; ++t)
         {    
 
-            for (int x=pml_size; x<Nx-pml_size ; ++x)
+            #ifdef PLANEWAVE
+            for (int x=(Nx-width)/2; x<(Nx+width)/2 ; ++x)
             {
             sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectEz(sourceE[t]);
             sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectDz(sourceE[t]);
             }
-//             sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectEz(sourceE[t]);
-//             sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectDz(sourceE[t]);
-
+             #endif
+            
+            #ifdef POINTSOURCE
+            sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectEz(sourceE[t]);
+            sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectDz(sourceE[t]);
+            #endif
 
             MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
             above_me+t, &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
@@ -455,14 +476,13 @@ int main(int argc, char *argv[])
 
             MPI_Barrier(MPI_COMM_WORLD);
             
-            
             update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
             
-            if(t == num_frame[which_frame])
-            {
-            SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-            which_frame += 1;
-            }
+//             if(t == num_frame[which_frame])
+//             {
+//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
+//             which_frame += 1;
+//             }
 
             
         }
@@ -553,11 +573,11 @@ int main(int argc, char *argv[])
             update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
 
             
-            if(t == num_frame[which_frame])
-            {
-            SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-            which_frame += 1;
-            }
+//             if(t == num_frame[which_frame])
+//             {
+//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
+//             which_frame += 1;
+//             }
         }
         delete sim_space;
         delete local_sigma_y;
@@ -653,11 +673,11 @@ int main(int argc, char *argv[])
             update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
 
             
-            if(t == num_frame[which_frame])
-            {
-            SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-            which_frame += 1;
-            }
+//             if(t == num_frame[which_frame])
+//             {
+//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
+//             which_frame += 1;
+//             }
         }
     delete sim_space;
     delete local_sigma_y;
@@ -739,11 +759,11 @@ int main(int argc, char *argv[])
             
             update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
         
-            if(t == num_frame[which_frame])
-            {            
-            SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-            which_frame+=1;
-            }
+//             if(t == num_frame[which_frame])
+//             {            
+//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
+//             which_frame+=1;
+//             }
 
         }
         delete sim_space;
