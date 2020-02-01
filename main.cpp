@@ -1,4 +1,3 @@
-#include <Ez_point.h>
 #include <soft_source.h>
 #include <PML_boundry.h>
 #include <update_func_PML.h>
@@ -24,11 +23,9 @@ int main(int argc, char *argv[])
     int rank{};
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
     MPI_Status status{};
-    //Makes data sendable via MPI:
-    MPI_Datatype MPI_POINT;
-    MPI_Type_contiguous(4, MPI_DOUBLE, &MPI_POINT); //initilise
-    MPI_Type_commit(&MPI_POINT);//activate
     double c{299792458};
+    
+    std::cout << "I entered: " << argv[1] << '\n';
     
 ////////////////////////////////////////////////////////////////////////////  
     
@@ -183,7 +180,10 @@ int main(int argc, char *argv[])
         double start_time = MPI_Wtime();
         // creates local simulation space, with extra row above_me
         // and bellow for data from other ranks to be pushed into
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        double *Ez_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Dz_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hx_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hy_space = new double[(sizes[rank]+2)*Nx]{};
         
         // creates conductivity profile for PML
         double *local_sigma_y = new double[sizes[rank]];
@@ -220,66 +220,83 @@ int main(int argc, char *argv[])
         for (int t=1; t<iterations; ++t)
         {   
 
-            MPI_Recv(&sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t, MPI_COMM_WORLD, &status);
-            MPI_Send(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+iterations, MPI_COMM_WORLD);
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Recv(&Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv(&Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv(&Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv(&Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(3 * iterations), MPI_COMM_WORLD, &status);            
             
-            update_H_pml(sim_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
-
-            MPI_Recv(&sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t+(2*iterations), MPI_COMM_WORLD, &status);
-            MPI_Send(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+(3*iterations), MPI_COMM_WORLD);
-            MPI_Barrier(MPI_COMM_WORLD);
-
-            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
+            MPI_Send(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me, under_me+t+(4 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me, under_me+t+(5 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me, under_me+t+(6 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me, under_me+t+(7 * iterations), MPI_COMM_WORLD);
             
-//             if(t == num_frame[which_frame])
-//             {
-//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-//             which_frame += 1;
-//             }
+            update_H_pml(Ez_space,Hx_space,Hy_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
+
+            MPI_Recv(&Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv(&Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv(&Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv(&Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(3 * iterations), MPI_COMM_WORLD, &status);            
+            
+            MPI_Send(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me, under_me+t+(4 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me, under_me+t+(5 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me, under_me+t+(6 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me, under_me+t+(7 * iterations), MPI_COMM_WORLD);
+
+            update_E_pml(Ez_space,Dz_space,Hx_space,Hy_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
+            
+            #ifdef SAVEFRAMES
+            if(t == num_frame[which_frame])
+            {
+            SaveToFile(Nx*sizes[rank], 
+                       &Ez_space[Nx], 
+                       &Hx_space[Nx], 
+                       &Hy_space[Nx], 
+                       "data/"+std::to_string(rank)+".txt");
+            which_frame += 1;
+            }
+            #endif
 
         }
         
         double endtime = MPI_Wtime();
         
-//         //save file with object map:
-//         std::fstream fs1;
-//         fs1.open("data/epmap.txt", std::fstream::in | std::fstream::out | std::fstream::trunc);
-//         for (int i=0; i<Nx*Ny; ++i)
-//         {
-//             fs1 << global_ep[i] << '\n';
-//         }
-//         fs1.close();
-//         
-//         // saves information on simulation parameters:
-//         std::fstream fs;
-//         fs.open("data/info.csv", std::fstream::in | std::fstream::out | std::fstream::trunc);
-//         fs << "Nx,"              << Nx<<'\n'
-//            << "Ny,"              << Ny<<'\n'
-//            << "Frames_saved,"    << which_frame<<'\n'
-//            << "Ranks,"           << size<<'\n'
-//            << "PML_size,"        << pml_size << '\n'
-//            << "Iterations,"      << iterations<<'\n'
-//            << "size,"            << Nx<<'\n'
-//            << "Time taken (s),"  << endtime - start_time << '\n'
-//            << "spacestep,"       << dx << '\n';
-//         
-//         for(int i=0; i<size; ++i)
-//         {
-//             fs << "RANK " << i << " size," << sizes[i] << '\n';
-//         }
-//         fs.close();
+        //save file with object map:
+        std::fstream fs1;
+        fs1.open("data/epmap.txt", std::fstream::in | std::fstream::out | std::fstream::trunc);
+        for (int i=0; i<Nx*Ny; ++i)
+        {
+            fs1 << global_ep[i] << '\n';
+        }
+        fs1.close();
+        
+        // saves information on simulation parameters:
+        std::fstream fs;
+        fs.open("data/info.csv", std::fstream::in | std::fstream::out | std::fstream::trunc);
+        fs << "Nx,"              << Nx<<'\n'
+           << "Ny,"              << Ny<<'\n'
+           << "Frames_saved,"    << which_frame<<'\n'
+           << "Ranks,"           << size<<'\n'
+           << "PML_size,"        << pml_size << '\n'
+           << "Iterations,"      << iterations<<'\n'
+           << "size,"            << Nx<<'\n'
+           << "Time taken (s),"  << endtime - start_time << '\n'
+           << "spacestep,"       << dx << '\n';
+        
+        for(int i=0; i<size; ++i)
+        {
+            fs << "RANK " << i << " size," << sizes[i] << '\n';
+        }
+        fs.close();
         
         std::fstream appender;
         appender.open("times.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
         appender << size << "," << endtime - start_time << '\n';
         appender.close();
 
-        delete sim_space;
+        delete Ez_space;
+        delete Dz_space;
+        delete Hx_space;
+        delete Hy_space;
         delete local_sigma_y;
         delete ep;
         delete Hx_coefs;
@@ -295,7 +312,10 @@ int main(int argc, char *argv[])
     {
         // creates local simulation space, with extra row above_me
         // and bellow for data from other ranks to be pushed into
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        double *Ez_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Dz_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hx_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hy_space = new double[(sizes[rank]+2)*Nx]{};
         
         // PML conductivity:
         double *local_sigma_y = new double[sizes[rank]];
@@ -331,44 +351,66 @@ int main(int argc, char *argv[])
 
         for (int t=1; t<iterations; ++t)
         {   
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
+                         &Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(1 * iterations), 
+                         &Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(2 * iterations), 
+                         &Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(3 * iterations), 
+                         &Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(3 * iterations), MPI_COMM_WORLD, &status);
 
-            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t, &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t,
-            MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(4 * iterations), 
+                         &Ez_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(5 * iterations), 
+                         &Dz_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(6 * iterations), 
+                         &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
+                         &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
+
             
-            MPI_Sendrecv(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+iterations, &sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+iterations,
-            MPI_COMM_WORLD, &status);
-
-            MPI_Barrier(MPI_COMM_WORLD);
             
-            update_H_pml(sim_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
+            update_H_pml(Ez_space,Hx_space,Hy_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
             
 
-            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t+(2*iterations), &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t+(2*iterations),
-            MPI_COMM_WORLD, &status);
-            
-            MPI_Sendrecv(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+(3*iterations), &sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+(3*iterations),
-            MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
+                         &Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(1 * iterations), 
+                         &Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(2 * iterations), 
+                         &Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(3 * iterations), 
+                         &Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(3 * iterations), MPI_COMM_WORLD, &status);
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Sendrecv(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(4 * iterations), 
+                         &Ez_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(5 * iterations), 
+                         &Dz_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(6 * iterations), 
+                         &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
+                         &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
 
-            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
+            update_E_pml(Ez_space,Dz_space,Hx_space,Hy_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
 
-//             if(t == num_frame[which_frame])
-//             {
-//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-//             which_frame += 1;
-//             }
+            #ifdef SAVEFRAMES
+            if(t == num_frame[which_frame])
+            {
+            SaveToFile(Nx*sizes[rank], 
+                       &Ez_space[Nx], 
+                       &Hx_space[Nx], 
+                       &Hy_space[Nx], 
+                       "data/"+std::to_string(rank)+".txt");
+            which_frame += 1;
+            }
+            #endif
         }
 
-        delete sim_space;
+        delete Ez_space;
+        delete Dz_space;
+        delete Hx_space;
+        delete Hy_space;
         delete local_sigma_y;
         delete ep;
         delete Hx_coefs;
@@ -387,7 +429,10 @@ int main(int argc, char *argv[])
         
         // creates local simulation space, with extra row above_me
         // and bellow for data from other ranks to be pushed into
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        double *Ez_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Dz_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hx_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hy_space = new double[(sizes[rank]+2)*Nx]{};
         
         // Chops out part of permitivity grid relavant to itself: 
         double *ep = new double[sizes[rank]*Nx];
@@ -439,55 +484,75 @@ int main(int argc, char *argv[])
             #ifdef PLANEWAVE
             for (int x=(Nx-width)/2; x<(Nx+width)/2 ; ++x)
             {
-            sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)].InjectDz(sourceE[t]);
+            Ez_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)] += sourceE[t];
+            Dz_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)] += sourceE[t];
             }
              #endif
             
             #ifdef POINTSOURCE
-            sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectEz(sourceE[t]);
-            sim_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)].InjectDz(sourceE[t]);
+            Ez_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)] += sourceE[t];
+            Dz_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)] += sourceE[t];
             #endif
 
-            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t, &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t,
-            MPI_COMM_WORLD, &status);
-            
-            MPI_Sendrecv(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+iterations, &sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+iterations,
-            MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
+                         &Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(1 * iterations), 
+                         &Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(2 * iterations), 
+                         &Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(3 * iterations), 
+                         &Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(3 * iterations), MPI_COMM_WORLD, &status);
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Sendrecv(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(4 * iterations), 
+                         &Ez_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(5 * iterations), 
+                         &Dz_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(6 * iterations), 
+                         &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
+                         &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
 
-            update_H_bulk(sim_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, Hx_coefs, Hy_coefs, ICHx, ICHy);
+            update_H_bulk(Ez_space,Hx_space,Hy_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, Hx_coefs, Hy_coefs, ICHx, ICHy);
 
             
-            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t+(2*iterations), &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t+(2*iterations),
-            MPI_COMM_WORLD, &status);
-            
-            MPI_Sendrecv(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+(3*iterations), &sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+(3*iterations),
-            MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
+                         &Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(1 * iterations), 
+                         &Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(2 * iterations), 
+                         &Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(3 * iterations), 
+                         &Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(3 * iterations), MPI_COMM_WORLD, &status);
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Sendrecv(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(4 * iterations), 
+                         &Ez_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(5 * iterations), 
+                         &Dz_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(6 * iterations), 
+                         &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
+                         &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
             
-            update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
+            update_E_bulk(Ez_space,Dz_space,Hx_space,Hy_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
             
-//             if(t == num_frame[which_frame])
-//             {
-//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-//             which_frame += 1;
-//             }
-
+            #ifdef SAVEFRAMES
+            if(t == num_frame[which_frame])
+            {
+            SaveToFile(Nx*sizes[rank], 
+                       &Ez_space[Nx], 
+                       &Hx_space[Nx], 
+                       &Hy_space[Nx], 
+                       "data/"+std::to_string(rank)+".txt");
+            which_frame += 1;
+            }
+            #endif
             
         }
         
-        delete sim_space;
+        delete Ez_space;
+        delete Dz_space;
+        delete Hx_space;
+        delete Hy_space;
         delete ep;
         delete mux;
         delete muy;
@@ -504,7 +569,10 @@ int main(int argc, char *argv[])
     {
         // creates local simulation space, with extra row above_me
         // and bellow for data from other ranks to be pushed into
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        double *Ez_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Dz_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hx_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hy_space = new double[(sizes[rank]+2)*Nx]{};
         
         // Creates PML sigma coficients
         double *local_sigma_y = new double[sizes[rank]];
@@ -552,34 +620,47 @@ int main(int argc, char *argv[])
         for (int t=1; t<iterations; ++t)
         {   
 
-            MPI_Send(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t, MPI_COMM_WORLD);
-            MPI_Recv( &sim_space[0], Nx, MPI_POINT, above_me,rank+t+iterations,
-            MPI_COMM_WORLD, &status);
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Send(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me , above_me+t+(0 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me , above_me+t+(1 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me , above_me+t+(2 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me , above_me+t+(3 * iterations), MPI_COMM_WORLD);
             
-            update_H_pml(sim_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
+            MPI_Recv( &Ez_space[0], Nx, MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv( &Dz_space[0], Nx, MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv( &Hx_space[0], Nx, MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv( &Hy_space[0], Nx, MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
             
-
-            MPI_Send(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t+(2*iterations), MPI_COMM_WORLD);
+            update_H_pml(Ez_space,Hx_space,Hy_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
             
-            MPI_Recv(&sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+(3*iterations),
-            MPI_COMM_WORLD, &status);
+            MPI_Send(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me , above_me+t+(0 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me , above_me+t+(1 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me , above_me+t+(2 * iterations), MPI_COMM_WORLD);
+            MPI_Send(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me , above_me+t+(3 * iterations), MPI_COMM_WORLD);
+            
+            MPI_Recv( &Ez_space[0], Nx, MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv( &Dz_space[0], Nx, MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv( &Hx_space[0], Nx, MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Recv( &Hy_space[0], Nx, MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
 
-            MPI_Barrier(MPI_COMM_WORLD);
-
-            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
+            update_E_pml(Ez_space,Dz_space,Hx_space,Hy_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
 
             
-//             if(t == num_frame[which_frame])
-//             {
-//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-//             which_frame += 1;
-//             }
+            #ifdef SAVEFRAMES
+            if(t == num_frame[which_frame])
+            {
+            SaveToFile(Nx*sizes[rank], 
+                       &Ez_space[Nx], 
+                       &Hx_space[Nx], 
+                       &Hy_space[Nx], 
+                       "data/"+std::to_string(rank)+".txt");
+            which_frame += 1;
+            }
+            #endif
         }
-        delete sim_space;
+        delete Ez_space;
+        delete Dz_space;
+        delete Hx_space;
+        delete Hy_space;
         delete local_sigma_y;
         delete ep;
         delete Hx_coefs;
@@ -595,7 +676,10 @@ int main(int argc, char *argv[])
     {
         // creates local simulation space, with extra row above_me
         // and bellow for data from other ranks to be pushed into
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        double *Ez_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Dz_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hx_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hy_space = new double[(sizes[rank]+2)*Nx]{};
 
         // Creates PML sigma coficients
         double *local_sigma_y = new double[sizes[rank]];
@@ -643,58 +727,82 @@ int main(int argc, char *argv[])
         for (int t=1; t<iterations; ++t)
         {   
 
-            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t, &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t,
-            MPI_COMM_WORLD, &status);
-            
-            MPI_Sendrecv(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+iterations, &sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+iterations,
-            MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
+                         &Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(1 * iterations), 
+                         &Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(2 * iterations), 
+                         &Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(3 * iterations), 
+                         &Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(3 * iterations), MPI_COMM_WORLD, &status);
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Sendrecv(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(4 * iterations), 
+                         &Ez_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(5 * iterations), 
+                         &Dz_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(6 * iterations), 
+                         &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
+                         &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
             
-            update_H_pml(sim_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
+            update_H_pml(Ez_space,Hx_space,Hy_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
             
 
-            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t+(2*iterations), &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t+(2*iterations),
-            MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
+                         &Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(1 * iterations), 
+                         &Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(2 * iterations), 
+                         &Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(3 * iterations), 
+                         &Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(3 * iterations), MPI_COMM_WORLD, &status);
+
+            MPI_Sendrecv(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(4 * iterations), 
+                         &Ez_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(5 * iterations), 
+                         &Dz_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(6 * iterations), 
+                         &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
+                         &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
+
+            update_E_pml(Ez_space,Dz_space,Hx_space,Hy_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
+
             
-            MPI_Sendrecv(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+(3*iterations), &sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+(3*iterations),
-            MPI_COMM_WORLD, &status);
-
-            MPI_Barrier(MPI_COMM_WORLD);
-
-            update_E_pml(sim_space, Nx, sizes[rank], ep,dx, dy, dt, Dz_coefs,IDz);
-
-            
-//             if(t == num_frame[which_frame])
-//             {
-//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-//             which_frame += 1;
-//             }
+            #ifdef SAVEFRAMES
+            if(t == num_frame[which_frame])
+            {
+            SaveToFile(Nx*sizes[rank], 
+                       &Ez_space[Nx], 
+                       &Hx_space[Nx], 
+                       &Hy_space[Nx], 
+                       "data/"+std::to_string(rank)+".txt");
+            which_frame += 1;
+            }
+            #endif
         }
-    delete sim_space;
-    delete local_sigma_y;
-    delete ep;
-    delete Hx_coefs;
-    delete Hy_coefs;
-    delete Dz_coefs;
-    delete IDz;
-    delete ICHx;
-    delete ICHy;
-    }
+        delete Ez_space;
+        delete Dz_space;
+        delete Hx_space;
+        delete Hy_space;
+        delete local_sigma_y;
+        delete ep;
+        delete Hx_coefs;
+        delete Hy_coefs;
+        delete Dz_coefs;
+        delete IDz;
+        delete ICHx;
+        delete ICHy;
+        }
 
     else
     {
         // creates local simulation space, with extra row above_me
         // and bellow for data from other ranks to be pushed into
-        Point *sim_space = new Point[(sizes[rank]+2)*Nx];
+        double *Ez_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Dz_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hx_space = new double[(sizes[rank]+2)*Nx]{};
+        double *Hy_space = new double[(sizes[rank]+2)*Nx]{};
         
         // Chops out part of permitivity grid relavant to itself:
         double *ep = new double[sizes[rank]*Nx];
@@ -730,43 +838,63 @@ int main(int argc, char *argv[])
         for (int t=1; t<iterations; ++t)
         {    
 
-            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t, &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t,
-            MPI_COMM_WORLD, &status);
-            
-            MPI_Sendrecv(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+iterations, &sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+iterations,
-            MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
+                         &Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(1 * iterations), 
+                         &Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(2 * iterations), 
+                         &Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(3 * iterations), 
+                         &Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(3 * iterations), MPI_COMM_WORLD, &status);
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Sendrecv(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(4 * iterations), 
+                         &Ez_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(5 * iterations), 
+                         &Dz_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(6 * iterations), 
+                         &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
+                         &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
 
-            update_H_bulk(sim_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, Hx_coefs, Hy_coefs, ICHx, ICHy);
+            update_H_bulk(Ez_space,Hx_space,Hy_space, Nx, sizes[rank], mux, muy, dx, dy, pml_size, Hx_coefs, Hy_coefs, ICHx, ICHy);
             
-            MPI_Sendrecv(&sim_space[index(1,0,Nx)], Nx, MPI_POINT, above_me ,
-            above_me+t+(2*iterations), &sim_space[index(sizes[rank]+1,0,Nx)] , Nx,
-            MPI_POINT, under_me,rank+t+(2*iterations),
-            MPI_COMM_WORLD, &status);
-            
-            MPI_Sendrecv(&sim_space[index(sizes[rank],0,Nx)], Nx, MPI_POINT, under_me ,
-            under_me+t+(3*iterations), &sim_space[0], Nx,
-            MPI_POINT, above_me,rank+t+(3*iterations),
-            MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
+                         &Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(1 * iterations), 
+                         &Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(2 * iterations), 
+                         &Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(3 * iterations), 
+                         &Hy_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me, rank+t+(3 * iterations), MPI_COMM_WORLD, &status);
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Sendrecv(&Ez_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(4 * iterations), 
+                         &Ez_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(4 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Dz_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(5 * iterations), 
+                         &Dz_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(5 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hx_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(6 * iterations), 
+                         &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
+            MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
+                         &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
             
-            
-            update_E_bulk(sim_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
+            update_E_bulk(Ez_space,Dz_space,Hx_space,Hy_space, Nx, sizes[rank], ep,dx, dy, dt, pml_size, Dz_coefs, IDz); 
         
-//             if(t == num_frame[which_frame])
-//             {            
-//             SaveToFile(Nx*sizes[rank], &sim_space[Nx], "data/"+std::to_string(rank)+".txt");
-//             which_frame+=1;
-//             }
+            #ifdef SAVEFRAMES
+            if(t == num_frame[which_frame])
+            {
+            SaveToFile(Nx*sizes[rank], 
+                       &Ez_space[Nx], 
+                       &Hx_space[Nx], 
+                       &Hy_space[Nx], 
+                       "data/"+std::to_string(rank)+".txt");
+            which_frame += 1;
+            }
+            #endif
 
         }
-        delete sim_space;
+        delete Ez_space;
+        delete Dz_space;
+        delete Hx_space;
+        delete Hy_space;
         delete ep;
         delete mux;
         delete muy;
