@@ -1,6 +1,8 @@
 #include <PML_boundry.h>
 #include <core_funcs.h>
 #include <iostream>
+#include <omp.h>
+
 // #pragma omp parallel default(none) num_threads(4)
 
 /*
@@ -22,10 +24,10 @@ void update_H_pml(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double 
     
     double new_Hx{};
     double new_Hy{};
-    
+
+// #pragma omp parallel for 
     for (int i=0; i<Ny; ++i)
     {    
-
         for (int j=0; j<Nx-1; ++j)
         {
             CEx = (Ez[index(i+2,j,Nx)] - Ez[index(i+1,j,Nx)]) / dy;
@@ -92,6 +94,7 @@ void update_E_pml(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, in
     double new_Dz{};
     double c{299792458};
 
+// #pragma omp parallel for 
     for (int i=0; i<Ny; ++i)
     {
         {
@@ -108,8 +111,7 @@ void update_E_pml(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, in
         Dz[index(i+1,j,Nx)] = new_Dz;
         Ez[index(i+1,j,Nx)] = new_Dz / ep[index(i,j,Nx)];
         }
-        
-        for (int j=1; j<=Nx-1; ++j)
+                for (int j=1; j<=Nx-1; ++j)
         {
             CHz = ((Hy[index(i+1,j,Nx)] - Hy[index(i+1,j-1,Nx)]) / dx ) - ((Hx[index(i+1,j,Nx)] - Hx[index(i,j,Nx)]) / dy );
             
@@ -150,7 +152,8 @@ void update_H_bulk(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double
     
     double new_Hx{};
     double new_Hy{};   
-    
+
+// #pragma omp parallel for 
     for (int i=0; i<Ny; ++i)
     {
         // left PML
@@ -191,7 +194,7 @@ void update_H_bulk(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double
             Hy[index(i+1,j,Nx)] = new_Hy;
             
         }
-   
+
         //Right PML
         for (int j=Nx-pml_size; j<Nx-1; ++j)
         {
@@ -260,6 +263,8 @@ void update_E_bulk(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, i
     double CHz{};
     double new_Dz{};
     double c{299792458};
+    
+//     #pragma omp parallel for 
 
     for (int i=0; i<Ny; ++i)
     {
@@ -278,7 +283,6 @@ void update_E_bulk(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, i
         Dz[index(i+1,j,Nx)] = new_Dz;
         Ez[index(i+1,j,Nx)] = new_Dz / ep[index(i,j,Nx)];
         }
-        
         // Left PML region :
         for (int j=1; j<pml_size; ++j)
         {
@@ -294,7 +298,7 @@ void update_E_bulk(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, i
             Dz[index(i+1,j,Nx)] = new_Dz;
             Ez[index(i+1,j,Nx)] = new_Dz / ep[index(i,j,Nx)];
         }
-        
+     
         // Bulk :
         for (int j=pml_size; j<Nx-pml_size; ++j)
         {
