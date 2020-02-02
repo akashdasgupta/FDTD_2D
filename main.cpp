@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     double dx {lambda_min / 20}; // at least 10 points per half wavelength
     double dy {lambda_min / 20};
     double dt {dx / (2*c)}; // best dispersion to resolution
-    int iterations {100000};    
+    int iterations {10000};        
 
     int Nx{gridsize / dx};
     int Ny{gridsize / dy};
