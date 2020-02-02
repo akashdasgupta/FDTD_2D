@@ -1,7 +1,7 @@
 #include <PML_boundry.h>
 #include <core_funcs.h>
 #include <iostream>
-// #include <omp.h>
+#include <omp.h>
 
 // #pragma omp parallel default(none) num_threads(4)
 
@@ -264,8 +264,7 @@ void update_E_bulk(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, i
     double new_Dz{};
     double c{299792458};
     
-//     #pragma omp parallel for 
-
+// #pragma omp parallel for 
     for (int i=0; i<Ny; ++i)
     {
         // Left most edge, mirrior like:
