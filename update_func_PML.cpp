@@ -1,7 +1,7 @@
 #include <PML_boundry.h>
 #include <core_funcs.h>
 #include <iostream>
-#include <omp.h>
+// #include <omp.h>
 
 // #pragma omp parallel default(none) num_threads(4)
 
@@ -111,7 +111,7 @@ void update_E_pml(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, in
         Dz[index(i+1,j,Nx)] = new_Dz;
         Ez[index(i+1,j,Nx)] = new_Dz / ep[index(i,j,Nx)];
         }
-                for (int j=1; j<=Nx-1; ++j)
+        for (int j=1; j<=Nx-1; ++j)
         {
             CHz = ((Hy[index(i+1,j,Nx)] - Hy[index(i+1,j-1,Nx)]) / dx ) - ((Hx[index(i+1,j,Nx)] - Hx[index(i,j,Nx)]) / dy );
             
