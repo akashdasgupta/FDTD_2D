@@ -9,7 +9,7 @@
 #include <string>
 #include <stdio.h>
 #include <cstdlib>
-// #include <omp.h>
+#include <omp.h>
 
 // Some initial params are preprocessor: 
 
@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     MPI_Status status{};
     double c{299792458};
     
-//     omp_set_num_threads(atoi(argv[1]));
+    omp_set_num_threads(atoi(argv[1]));
     
 ////////////////////////////////////////////////////////////////////////////  
     
@@ -294,7 +294,7 @@ int main(int argc, char *argv[])
         #endif
         std::fstream appender;
         appender.open("times.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
-        appender << size << "," << endtime - start_time << '\n';
+        appender << size << "," << argv[1] << "," << endtime - start_time << '\n';
         appender.close();
 
         delete Ez_space;
