@@ -52,12 +52,12 @@ for k, element in enumerate(ep_holder):
 
 points= []
 
-for i in range(ep_image.shape[0]):
-    for j in range(ep_image.shape[1]):
-        if ep_image[i-1,j] != ep_image[i,j]:
-            points.append((j,i))
-points = np.array(points)
-hull = sp.ConvexHull(points)
+#for i in range(ep_image.shape[0]):
+    #for j in range(ep_image.shape[1]):
+        #if ep_image[i-1,j] != ep_image[i,j]:
+            #points.append((j,i))
+#points = np.array(points)
+#hull = sp.ConvexHull(points)
 
 inner = [(params['PML_size'],params['PML_size']),
          (params['Nx']-params['PML_size'],params['PML_size']), 
@@ -89,7 +89,7 @@ for data_file_number in range(params['Ranks']):
 #plt.close('all')
 
 fig = plt.figure()
-scale =2
+scale =0.07
 sizer = ((params['Nx']/2) * params['spacestep']) / 1e-6
 
 im=plt.imshow(data[0], vmin=-scale, vmax=scale, cmap='jet', interpolation='none', extent=[-sizer,sizer,-sizer,sizer])
@@ -102,10 +102,10 @@ plt.tight_layout()
 
 stepscale = params['spacestep'] / 1e-6
 
-for simplex in hull.simplices:
-    plt.plot(points[simplex, 0]*stepscale - sizer, -points[simplex, 1]*stepscale + sizer, 'k-')
+#for simplex in hull.simplices:
+    #plt.plot(points[simplex, 0]*stepscale - sizer, -points[simplex, 1]*stepscale + sizer, 'k-')
 
-screen_position = params['Nx'] / 10 + 10
+#screen_position = params['Nx'] / 10 + 10
 
 
 def animate(t):
