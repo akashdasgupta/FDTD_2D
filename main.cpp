@@ -9,14 +9,15 @@
 #include <string>
 #include <stdio.h>
 #include <cstdlib>
-#include <omp.h>
+#include <string>
+// #include <omp.h>
 
 // Some initial params are preprocessor: 
 
-#define PLANEWAVE   //PLANEWAVE or POINTSOURCE
+#define POINTSOURCE   //PLANEWAVE or POINTSOURCE
 #define CW          // PULSED or CW
-//#define SAVEFRAMES
-# define ALL_IO_OFF
+#define SAVEFRAMES
+//# define ALL_IO_OFF
 
 int main(int argc, char *argv[])
 {
@@ -28,7 +29,7 @@ int main(int argc, char *argv[])
     MPI_Status status{};
     double c{299792458};
     
-    omp_set_num_threads(atoi(argv[1]));
+//     omp_set_num_threads(atoi(argv[1]));
     
 ////////////////////////////////////////////////////////////////////////////  
     
@@ -37,7 +38,7 @@ int main(int argc, char *argv[])
     double time            {100e-15};
     double lambda_min      {200e-9};                                            
     double pml_size_ratio  {10};                                            
-    int pml_ratio          {3};                                                     
+    int pml_ratio          {2};                                                     
     int frames_to_save     {300};  
     
     
@@ -53,13 +54,13 @@ int main(int argc, char *argv[])
     double slit_seperation    {500e-9};
 
 ////////////////////////////////////////////////////////////////////////////  
-    
+//     std::cout << "RANK: " << rank << " got this far  56" << '\n';
     
     // Calculated parameters:
     double dx {lambda_min / 20}; // at least 10 points per half wavelength
     double dy {lambda_min / 20};
     double dt {dx / (2*c)}; // best dispersion to resolution
-    int iterations {10000};        
+    int iterations {10};        
 
     int Nx{gridsize / dx};
     int Ny{gridsize / dy};
@@ -91,6 +92,7 @@ int main(int argc, char *argv[])
         double_slit(global_ep,Nx,Ny, center_y, center_x,slit_seperation_pix,width);
     }
     
+//     std::cout << "RANK: " << rank << " got this far  94" << '\n';
 
     // creates graded sigma profile for PML boundry:
     double * sigma_x = new double[pml_size];
@@ -292,9 +294,10 @@ int main(int argc, char *argv[])
         }
         fs.close();
         #endif
+        
         std::fstream appender;
-        appender.open("times.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
-        appender << size << "," << argv[1] << "," << endtime - start_time << '\n';
+        appender.open("./times.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
+        appender << size << "," << endtime - start_time << '\n';
         appender.close();
 
         delete Ez_space;
