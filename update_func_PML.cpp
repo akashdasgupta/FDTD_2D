@@ -1,7 +1,7 @@
 #include <PML_boundry.h>
 #include <core_funcs.h>
 #include <iostream>
-#include <omp.h>
+// #include <omp.h>
 
 // #pragma omp parallel default(none) num_threads(4)
 
