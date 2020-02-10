@@ -1,13 +1,12 @@
 #include <PML_boundry.h>
 #include <core_funcs.h>
 #include <iostream>
-// #include <omp.h>
-
-// #pragma omp parallel default(none) num_threads(4)
 
 /*
 * Updates magnetic field on all points of simulation space, for region within the 'top' PML 
-* @param[out] space simulation space over which to work 
+* @param[out] Ez electric field space
+* @param[out] Hx magnetic field (x) space
+* @param[out] Hy magnetic field (y) space
 * @param Nx number of cols
 * @param Ny number of rows
 * @param dx finitestep in x
@@ -77,8 +76,10 @@ void update_H_pml(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double 
 
 /*
 * Updates electric field on all points of simulation space, for region within the 'top' PML 
-* @param[out] space simulation space over which to work 
-* @param Nx number of cols
+* @param[out] Ez electric field space
+* @param[out] Dz electric displacement field space
+* @param[out] Hx magnetic field (x) space
+* @param[out] Hy magnetic field (y) space* @param Nx number of cols
 * @param Ny number of rows
 * @param ep permitivities on grid
 * @param dx finitestep in x
@@ -86,7 +87,6 @@ void update_H_pml(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double 
 * @param coefs_Dz Coefficients for Dz at each point (same dimentions as sim space)
 * @param[out] IDz integrals for Dz (same dimentions as sim space) 
 */
-
 void update_E_pml(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, int Ny, double ep[], double dx, double dy, double dt, PML_coefs coefs_Dz[], double IDz[])
 {
     double CHz{};
@@ -129,7 +129,9 @@ void update_E_pml(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, in
 
 /*
 * Updates magnetic field on all points of simulation space, outside region of the 'top' and 'bottom' PML 
-* @param[out] space simulation space over which to work 
+* @param[out] Ez electric field space
+* @param[out] Hx magnetic field (x) space
+* @param[out] Hy magnetic field (y) space
 * @param Nx number of cols
 * @param Ny number of rows
 * @param mux permibility in x
@@ -243,7 +245,10 @@ void update_H_bulk(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double
 
 /*
 * Updates electric field on all points of simulation space, outside region of the 'top' and 'bottom' PML 
-* @param[out] space simulation space over which to work 
+* @param[out] Ez electric field space
+* @param[out] Dz electric displacement field space
+* @param[out] Hx magnetic field (x) space
+* @param[out] Hy magnetic field (y) space* @param Nx number of cols
 * @param Nx number of cols
 * @param Ny number of rows
 * @param ep permitivities on grid
