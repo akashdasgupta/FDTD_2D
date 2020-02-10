@@ -2,6 +2,16 @@
 #include <objects.h>
 #include <core_funcs.h>
 
+/*
+ * Modifies permitivity grid to create planar convex lense
+ * @param [out] ep the permitivity grid to act on
+ * @param Nx Gridsixe (x)
+ * @param Ny Gridsize (y)
+ * @param center_x position in x of center of lens axis
+ * @ param center_x position in y of center of lens axis
+ * @param radius radius of curvature of the lens
+ * @param width the lens diameter
+ */
 void lense_col(double ep[], int Nx, int Ny, int center_x, int center_y, int radius, int width)
 {
     double rad_center_y{(center_y) + sqrt((radius * radius ) -(width * width / 4))};
@@ -25,6 +35,16 @@ void lense_col(double ep[], int Nx, int Ny, int center_x, int center_y, int radi
     }  
 }
 
+/*
+ * Modifies permitivity grid to create biconvex lense
+ * @param [out] ep the permitivity grid to act on
+ * @param Nx Gridsixe (x)
+ * @param Ny Gridsize (y)
+ * @param center_x position in x of center of lens axis
+ * @ param center_x position in y of center of lens axis
+ * @param radius radius of curvature of the lens
+ * @param width the lens diameter
+ */
 void lense_foc(double ep[], int Nx, int Ny, int center_x, int center_y, int radius, int width)
 {
     double rad_center_under_y{(center_y) + sqrt((radius * radius ) -(width * width / 4))};
@@ -52,13 +72,25 @@ void lense_foc(double ep[], int Nx, int Ny, int center_x, int center_y, int radi
     }  
 }
 
+/*
+ * Modifies permitivity grid to create a double slit
+ * @param [out] ep the permitivity grid to act on
+ * @param Nx Gridsixe (x)
+ * @param Ny Gridsize (y)
+ * @param height y position of wall
+ * @param center_x position in x of center of double slit
+ * @param slit_seperation seperation of the double slits
+ * @param width width of the slits
+ */
 void double_slit(double ep[], int Nx, int Ny, int height, int center_x, int slit_seperation, int width)
 {
+    // creates a wall of high permitivity, with  gaps between boundry 1 to 2, 3 to 4
     int boundry_1{center_x - (slit_seperation + width) /2};
     int boundry_2{center_x - (slit_seperation - width) /2};
     int boundry_3{center_x + (slit_seperation - width) /2};
     int boundry_4{center_x + (slit_seperation + width) /2};
     
+    // starts off with 1s grid:
     for(int i=0; i<Ny; ++i)
     {
         for(int j=0; j<Nx; ++j)
@@ -67,8 +99,7 @@ void double_slit(double ep[], int Nx, int Ny, int height, int center_x, int slit
         }
     }
     
-    std::cout <<height << " , " << boundry_1 << " , " <<boundry_2 << " , " <<boundry_3 << " , " <<boundry_4 << '\n';
-    
+    // creats wall:
     for (int j = 0; j<boundry_1; ++j)
     {
         ep[index(height,j,Nx)] = 1e20;
@@ -82,5 +113,30 @@ void double_slit(double ep[], int Nx, int Ny, int height, int center_x, int slit
     for (int j = boundry_4; j<Nx; ++j)
     {
         ep[index(height,j,Nx)] = 1e20;
+    }
+}
+
+/*
+ * Modifies permitivity grid to create tunneling setup: whole grid @ refractive index of root 2.5, with 45 deg gap of index 1 diagonally cutting
+ * @param [out] ep the permitivity grid to act on
+ * @param Nx Gridsixe (x)
+ * @param Ny Gridsize (y)
+ * @param width width of gap
+ */
+void tunnelling(double ep[], int Nx, int Ny, int width)
+{
+    for (int i=0;i<Ny;++i)
+    {
+        for(int j=0;j<Nx;++j)
+        {
+            if (i< j || i>(width+j))
+            {
+                ep[index(i,j,Nx)] = 2.5;
+            }
+            else
+            {
+                ep[index(i,j,Nx)] = 1;
+            }
+        }
     }
 }
