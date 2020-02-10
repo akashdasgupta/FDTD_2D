@@ -30,3 +30,4 @@
 * Can be visualised through provided vis.py, already set up for mentioned pre-built simulations
 * Requires a whole load of modules, backends, etc, so best to just use an anaconda install
 * Reads data from data folder, and saves video of the data
+* Some pre made visualisations: https://www.youtube.com/playlist?list=PLf3Nybtc1FCUuG23Yk8cgfeWPAlDplxHU
