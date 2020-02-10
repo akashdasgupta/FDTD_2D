@@ -10,14 +10,14 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <string>
-// #include <omp.h>
 
 // Some initial params are preprocessor: 
 
 #define POINTSOURCE   //PLANEWAVE or POINTSOURCE
 #define CW          // PULSED or CW
 //#define SAVEFRAMES
-# define ALL_IO_OFF
+#define ALL_IO_OFF
+
 
 int main(int argc, char *argv[])
 {
@@ -29,22 +29,21 @@ int main(int argc, char *argv[])
     MPI_Status status{};
        
     double c{299792458};
-    
-//     omp_set_num_threads(atoi(argv[1]));
-    
+       
 ////////////////////////////////////////////////////////////////////////////  
     
     //INITIAL PARAMS:                                                     
     double gridsize        {10e-6}; // Just gonna use square grids 
     double time            {100e-15};
-    double lambda_min      {200e-9};                                            
+    double lambda_min      {200e-9}; // chang as approriate, funcs here use 200nm                                           
     double pml_size_ratio  {10};                                            
-    int pml_ratio          {2};                                                     
+    int pml_ratio          {2}; // ratio of task density in PML region                                                 
     int frames_to_save     {300};  
     
     
     double source_position[2]  {gridsize/2,gridsize/2};// {x,y}
-    int objecttype             {4}; // 1=planar_convex_lens, 2=biconvel lens, 3 = double_slit
+    int objecttype             {4}; // 1=planar_convex_lens, 2=biconvel lens, 
+                                    // 3 = double_slit, 4= tunelling
     double object_position[2]  {gridsize/2,900e-9}; // {x,y}
     
     // for lens:
@@ -53,6 +52,8 @@ int main(int argc, char *argv[])
     // for double slit:
     double slit_width         {50e-9};
     double slit_seperation    {500e-9};
+    // for tunnelling:
+    double airgap_width       {200e-9};
 
 ////////////////////////////////////////////////////////////////////////////  
 
@@ -60,37 +61,43 @@ int main(int argc, char *argv[])
     double dx {lambda_min / 20}; // at least 10 points per half wavelength
     double dy {lambda_min / 20};
     double dt {dx / (2*c)}; // best dispersion to resolution
-    int iterations {10000};    
-
+    int iterations {time / dt};    
     int Nx{gridsize / dx};
     int Ny{gridsize / dy};
     int pml_size{Nx / pml_size_ratio};
+    
     // Creating the object:
     int center_x {object_position[0]/dx};
     int center_y {object_position[1]/dy};
-    int radius_of_curvature_pix{rad_of_curvature/dx}; 
-    int slit_seperation_pix{slit_seperation/dx};
     int width{};
 
     // makes an array with permitivity
     // each process chops from this 
     double *global_ep = new double[Nx*Ny];
-
     
+    // creates object based on choice of initial params
     if (objecttype == 1)
     {
+        int radius_of_curvature_pix{rad_of_curvature/dx}; 
         width = lens_width / dx;
         lense_col(global_ep,Nx,Ny,center_x, center_y, radius_of_curvature_pix, width);
     }
     else if (objecttype == 2)
     {
+        int radius_of_curvature_pix{rad_of_curvature/dx}; 
         width = lens_width / dx;
         lense_foc(global_ep,Nx,Ny,center_x, center_y, radius_of_curvature_pix, width);
     }
     else if (objecttype == 3)
     {
+        int slit_seperation_pix{slit_seperation/dx};
         width = slit_width / dx;
         double_slit(global_ep,Nx,Ny, center_y, center_x,slit_seperation_pix,width);
+    }
+    else if (objecttype == 4)
+    {
+        int width {airgap_width / dx};
+        tunnelling(global_ep, Nx, Ny, width);
     }
     else
     {
@@ -103,20 +110,6 @@ int main(int argc, char *argv[])
         }
     }
     
-//     for (int i=0;i<Ny;++i)
-//     {
-//         for(int j=0;j<Nx;++j)
-//         {
-//             if (i< j || i>(8+j))
-//             {
-//                 global_ep[index(i,j,Nx)] = 2.5;
-//             }
-//             else
-//             {
-//                 global_ep[index(i,j,Nx)] = 1;
-//             }
-//         }
-//     }
     
     // creates graded sigma profile for PML boundry:
     double * sigma_x = new double[pml_size];
@@ -199,10 +192,14 @@ int main(int argc, char *argv[])
         c_sizes[i] = sizes[i] + c_sizes[i-1]; // pupulates cumilative size recursively
     }
     
+    // figures out which rank source lives in:
     int source_position_x {source_position[0]/dx};
     int source_position_y {source_position[1]/dy};
     int rank_source =rank_index_y(source_position_y, Ny, sizes, size);
 
+    // thee following is very long, but for a reason. In order to completely avoid if statements 
+    // in the main loops, multiple near identical chunks of code was needed
+    // This is less reader friendly but also makes the code faster
     
     if (rank == 0)
     {
@@ -249,7 +246,7 @@ int main(int argc, char *argv[])
 
         for (int t=1; t<iterations; ++t)
         {   
-
+    
             MPI_Recv(&Ez_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(0 * iterations), MPI_COMM_WORLD, &status);
             MPI_Recv(&Dz_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(1 * iterations), MPI_COMM_WORLD, &status);
             MPI_Recv(&Hx_space[index(sizes[rank]+1,0,Nx)], Nx, MPI_DOUBLE, under_me,rank+t+(2 * iterations), MPI_COMM_WORLD, &status);
@@ -288,8 +285,11 @@ int main(int argc, char *argv[])
 
         }
         
+        // this rank ends things off by handeling basic parameter reporting
+        
         double endtime = MPI_Wtime();
         
+        // Saves map of permitivity, object's nature can be recovered from this::
         # ifndef ALL_IO_OFF
         //save file with object map:
         std::fstream fs1;
@@ -319,11 +319,6 @@ int main(int argc, char *argv[])
         }
         fs.close();
         #endif
-        
-        std::fstream appender;
-        appender.open("./o2sweep.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
-        appender << size << "," << endtime - start_time << '\n';
-        appender.close();
 
         delete Ez_space;
         delete Dz_space;
@@ -496,8 +491,6 @@ int main(int argc, char *argv[])
         
         //creates source array in advanced to save compute
         double *sourceE = new double[iterations];
-        double *sourceHx = new double[iterations];
-        double *sourceHy = new double[iterations];
         int local_center_y {source_position_y-c_sizes[rank-1]+1};
         if (local_center_y <=0)
         {
@@ -505,24 +498,24 @@ int main(int argc, char *argv[])
         }
         
         #ifdef CW
-        inject_soft_source2(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
+        inject_soft_source2(sourceE,iterations,dt, source_sigma, t0);
         #endif
         
         #ifdef PULSED
-        inject_soft_source(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
+        inject_soft_source(sourceE,iterations,dt, source_sigma, t0);
         #endif
 
 
         for (int t=1; t<iterations; ++t)
         {    
-
+            // Plane wave made the same as width of lens/dearure, can change this if you want
             #ifdef PLANEWAVE
             for (int x=(Nx - width)/2; x<(Nx+width)/2 ; ++x)
             {
             Ez_space[local_center_y, x, Nx)] += sourceE[t];
             Dz_space[local_center_y, x, Nx)] += sourceE[t];
             }
-             #endif
+            #endif
             
             #ifdef POINTSOURCE
             Ez_space[index(local_center_y, source_position_x, Nx)] += sourceE[t];
@@ -588,6 +581,7 @@ int main(int argc, char *argv[])
         delete Dz_space;
         delete Hx_space;
         delete Hy_space;
+        delete sourceE;
         delete ep;
         delete mux;
         delete muy;
