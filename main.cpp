@@ -16,8 +16,8 @@
 
 #define POINTSOURCE   //PLANEWAVE or POINTSOURCE
 #define CW          // PULSED or CW
-#define SAVEFRAMES
-//# define ALL_IO_OFF
+//#define SAVEFRAMES
+# define ALL_IO_OFF
 
 int main(int argc, char *argv[])
 {
@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
     int rank{};
     MPI_Comm_rank(MPI_COMM_WORLD,&rank);
     MPI_Status status{};
+       
     double c{299792458};
     
 //     omp_set_num_threads(atoi(argv[1]));
@@ -34,7 +35,7 @@ int main(int argc, char *argv[])
 ////////////////////////////////////////////////////////////////////////////  
     
     //INITIAL PARAMS:                                                     
-    double gridsize        {3e-6}; // Just gonna use square grids 
+    double gridsize        {10e-6}; // Just gonna use square grids 
     double time            {100e-15};
     double lambda_min      {200e-9};                                            
     double pml_size_ratio  {10};                                            
@@ -42,8 +43,8 @@ int main(int argc, char *argv[])
     int frames_to_save     {300};  
     
     
-    double source_position[2]  {gridsize/2,320e-9};// {x,y}
-    int objecttype             {2}; // 1=planar_convex_lens, 2=biconvel lens, 3 = double_slit
+    double source_position[2]  {gridsize/2,gridsize/2};// {x,y}
+    int objecttype             {4}; // 1=planar_convex_lens, 2=biconvel lens, 3 = double_slit
     double object_position[2]  {gridsize/2,900e-9}; // {x,y}
     
     // for lens:
@@ -54,28 +55,28 @@ int main(int argc, char *argv[])
     double slit_seperation    {500e-9};
 
 ////////////////////////////////////////////////////////////////////////////  
-//     std::cout << "RANK: " << rank << " got this far  56" << '\n';
-    
+
     // Calculated parameters:
     double dx {lambda_min / 20}; // at least 10 points per half wavelength
     double dy {lambda_min / 20};
     double dt {dx / (2*c)}; // best dispersion to resolution
-    int iterations {10};        
+    int iterations {10000};    
 
     int Nx{gridsize / dx};
     int Ny{gridsize / dy};
     int pml_size{Nx / pml_size_ratio};
-    
     // Creating the object:
     int center_x {object_position[0]/dx};
     int center_y {object_position[1]/dy};
     int radius_of_curvature_pix{rad_of_curvature/dx}; 
     int slit_seperation_pix{slit_seperation/dx};
     int width{};
-    
+
     // makes an array with permitivity
     // each process chops from this 
     double *global_ep = new double[Nx*Ny];
+
+    
     if (objecttype == 1)
     {
         width = lens_width / dx;
@@ -86,20 +87,42 @@ int main(int argc, char *argv[])
         width = lens_width / dx;
         lense_foc(global_ep,Nx,Ny,center_x, center_y, radius_of_curvature_pix, width);
     }
-    else
+    else if (objecttype == 3)
     {
         width = slit_width / dx;
         double_slit(global_ep,Nx,Ny, center_y, center_x,slit_seperation_pix,width);
     }
+    else
+    {
+        for (int i=0;i<Ny;++i)
+        {
+            for(int j=0;j<Nx;++j)
+            {
+                global_ep[index(i,j,Nx)] = 1;
+            }
+        }
+    }
     
-//     std::cout << "RANK: " << rank << " got this far  94" << '\n';
-
+//     for (int i=0;i<Ny;++i)
+//     {
+//         for(int j=0;j<Nx;++j)
+//         {
+//             if (i< j || i>(8+j))
+//             {
+//                 global_ep[index(i,j,Nx)] = 2.5;
+//             }
+//             else
+//             {
+//                 global_ep[index(i,j,Nx)] = 1;
+//             }
+//         }
+//     }
+    
     // creates graded sigma profile for PML boundry:
     double * sigma_x = new double[pml_size];
     double *sigma_y = new double[pml_size];
     sigma_setter(sigma_x,sigma_y, pml_size,dt);
         
-    
     // for saving of frames: 
     int frame_interval = (frames_to_save + iterations - (iterations%frames_to_save))/frames_to_save;
     
@@ -117,6 +140,7 @@ int main(int argc, char *argv[])
                             * static_cast<double>(size) 
                             / (static_cast<double>(Ny) - ((1-static_cast<double>(pml_ratio)) 
                             * static_cast<double>(pml_size)));
+
     int n_pml = density_pml * pml_size;
     if (n_pml == 0)
     {
@@ -183,27 +207,28 @@ int main(int argc, char *argv[])
     if (rank == 0)
     {
         double start_time = MPI_Wtime();
+
         // creates local simulation space, with extra row above_me
         // and bellow for data from other ranks to be pushed into
         double *Ez_space = new double[(sizes[rank]+2)*Nx]{};
         double *Dz_space = new double[(sizes[rank]+2)*Nx]{};
         double *Hx_space = new double[(sizes[rank]+2)*Nx]{};
         double *Hy_space = new double[(sizes[rank]+2)*Nx]{};
-        
+
         // creates conductivity profile for PML
         double *local_sigma_y = new double[sizes[rank]];
         for (int i=0; i<sizes[rank]; i++)
         {
             local_sigma_y[i] = sigma_x[pml_size-(i+1)];
         }
-        
+
         // Chops out part of permitivity grid relavant to itself:
         double *ep = new double[sizes[rank]*Nx];
         for (int j=0; j<Nx; ++j)
         {
             for (int i=0; i<sizes[rank]; ++i)
             {
-                ep[index(i,j,Nx)] = global_ep[index(i+c_sizes[rank-1],j,Nx)];
+                ep[index(i,j,Nx)] = global_ep[index(i,j,Nx)];
             }
         }
 
@@ -296,7 +321,7 @@ int main(int argc, char *argv[])
         #endif
         
         std::fstream appender;
-        appender.open("./times.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
+        appender.open("./o2sweep.csv",  std::fstream::in | std::fstream::out | std::fstream::app);
         appender << size << "," << endtime - start_time << '\n';
         appender.close();
 
@@ -375,8 +400,6 @@ int main(int argc, char *argv[])
                          &Hx_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(6 * iterations), MPI_COMM_WORLD, &status);
             MPI_Sendrecv(&Hy_space[index(sizes[rank],0,Nx)], Nx, MPI_DOUBLE, under_me , under_me+t+(7 * iterations), 
                          &Hy_space[0], Nx,MPI_DOUBLE, above_me, rank+t+(7 * iterations), MPI_COMM_WORLD, &status);
-
-            
             
             update_H_pml(Ez_space,Hx_space,Hy_space, Nx, sizes[rank], dx, dy, Hx_coefs, Hy_coefs,ICHx, ICHy);
             
@@ -475,6 +498,11 @@ int main(int argc, char *argv[])
         double *sourceE = new double[iterations];
         double *sourceHx = new double[iterations];
         double *sourceHy = new double[iterations];
+        int local_center_y {source_position_y-c_sizes[rank-1]+1};
+        if (local_center_y <=0)
+        {
+            local_center_y = 1;
+        }
         
         #ifdef CW
         inject_soft_source2(sourceE, sourceHx, sourceHy,iterations,dx,dy,dt, 1, 1, 1,1, source_sigma, t0);
@@ -489,16 +517,16 @@ int main(int argc, char *argv[])
         {    
 
             #ifdef PLANEWAVE
-            for (int x=(Nx-width)/2; x<(Nx+width)/2 ; ++x)
+            for (int x=(Nx - width)/2; x<(Nx+width)/2 ; ++x)
             {
-            Ez_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)] += sourceE[t];
-            Dz_space[index(source_position_y-c_sizes[rank-1]+1, x, Nx)] += sourceE[t];
+            Ez_space[local_center_y, x, Nx)] += sourceE[t];
+            Dz_space[local_center_y, x, Nx)] += sourceE[t];
             }
              #endif
             
             #ifdef POINTSOURCE
-            Ez_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)] += sourceE[t];
-            Dz_space[index(source_position_y-c_sizes[rank-1]+1, source_position_x, Nx)] += sourceE[t];
+            Ez_space[index(local_center_y, source_position_x, Nx)] += sourceE[t];
+            Dz_space[index(local_center_y, source_position_x, Nx)] += sourceE[t];
             #endif
 
             MPI_Sendrecv(&Ez_space[index(1,0,Nx)], Nx, MPI_DOUBLE, above_me, above_me+t+(0 * iterations), 
