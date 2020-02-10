@@ -15,8 +15,8 @@
 
 #define POINTSOURCE   //PLANEWAVE or POINTSOURCE
 #define CW          // PULSED or CW
-//#define SAVEFRAMES
-#define ALL_IO_OFF
+#define SAVEFRAMES
+//#define ALL_IO_OFF
 
 
 int main(int argc, char *argv[])
@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 ////////////////////////////////////////////////////////////////////////////  
     
     //INITIAL PARAMS:                                                     
-    double gridsize        {10e-6}; // Just gonna use square grids 
+    double gridsize        {1e-6}; // Just gonna use square grids 
     double time            {100e-15};
     double lambda_min      {200e-9}; // chang as approriate, funcs here use 200nm                                           
     double pml_size_ratio  {10};                                            
@@ -41,19 +41,19 @@ int main(int argc, char *argv[])
     int frames_to_save     {300};  
     
     
-    double source_position[2]  {gridsize/2,gridsize/2};// {x,y}
+    double source_position[2]  {gridsize/2,gridsize/4};// {x,y}
     int objecttype             {4}; // 1=planar_convex_lens, 2=biconvel lens, 
                                     // 3 = double_slit, 4= tunelling
-    double object_position[2]  {gridsize/2,900e-9}; // {x,y}
+    double object_position[2]  {gridsize/2,gridsize/2}; // {x,y}
     
     // for lens:
-    double rad_of_curvature   {2e-6};
-    double lens_width         {1.5e-6};
+    double rad_of_curvature   {0.6e-6};
+    double lens_width         {0.5e-6};
     // for double slit:
-    double slit_width         {50e-9};
-    double slit_seperation    {500e-9};
+    double slit_width         {10e-9};
+    double slit_seperation    {50e-9};
     // for tunnelling:
-    double airgap_width       {200e-9};
+    double airgap_width       {50e-9};
 
 ////////////////////////////////////////////////////////////////////////////  
 
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
     double dx {lambda_min / 20}; // at least 10 points per half wavelength
     double dy {lambda_min / 20};
     double dt {dx / (2*c)}; // best dispersion to resolution
-    int iterations {time / dt};    
+    int iterations {500 };//time / dt};    
     int Nx{gridsize / dx};
     int Ny{gridsize / dy};
     int pml_size{Nx / pml_size_ratio};
