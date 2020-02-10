@@ -94,7 +94,7 @@ anim = animation.FuncAnimation( fig,
                                 interval = 1000 / 30, # in ms
                                 )
 
-anim.save('test_anim.mp4', fps=15, extra_args=['-vcodec', 'libx264'], dpi=300)
+anim.save('untitled.mp4', fps=15, extra_args=['-vcodec', 'libx264'], dpi=300)
 
 
 
