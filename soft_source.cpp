@@ -45,7 +45,7 @@ void inject_soft_source2(double Ez[], int iterations, double dt, double sigma, d
     for (int i=0; i<iterations; ++i)
     {
         // tanh term ensures the source injection is gradual
-        double wavelength {200e-9} // can change if needed
+        double wavelength {200e-9}; // can change if needed
         Ez[i] = (0.5 * std::tanh(((t[i] - t0)/ sigma)) + 0.5) * std::sin(2 * 3.14159265359* c *t[i] /wavelength);
     }
 }
