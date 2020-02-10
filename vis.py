@@ -52,11 +52,13 @@ for k, element in enumerate(ep_holder):
 
 points= []
 
-#for i in range(ep_image.shape[0]):
-    #for j in range(ep_image.shape[1]):
-        #if ep_image[i-1,j] != ep_image[i,j]:
-            #points.append((j,i))
-#points = np.array(points)
+ep_image.transpose()
+
+for i in range(ep_image.shape[0]):
+    for j in range(ep_image.shape[1]):
+        if ep_image[i-1,j] != ep_image[i,j]:
+            points.append((i,j))
+points = np.array(points)
 #hull = sp.ConvexHull(points)
 
 inner = [(params['PML_size'],params['PML_size']),
@@ -82,6 +84,7 @@ for data_file_number in range(params['Ranks']):
             data[t][global_i + i,j] = row[0]
     global_i += sizes[data_file_number]
     
+
     
 #plt.plot([(i-params['Nx']/2)*params['spacestep'] for i in range(params['Nx'])],
          #[i for i in data[-1][stepscale,:]])
@@ -89,14 +92,18 @@ for data_file_number in range(params['Ranks']):
 #plt.close('all')
 
 fig = plt.figure()
-scale =0.07
+scale =0.5
 sizer = ((params['Nx']/2) * params['spacestep']) / 1e-6
 
 im=plt.imshow(data[0], vmin=-scale, vmax=scale, cmap='jet', interpolation='none', extent=[-sizer,sizer,-sizer,sizer])
+
+
 cbar=plt.colorbar()
 cbar.set_label(r"E Field / $\sqrt{Js^{-1}}$")
 plt.xlabel(r"x ($\mu$m)")
 plt.ylabel(r"y ($\mu$m)")
+
+
 
 plt.tight_layout()
 
@@ -106,6 +113,14 @@ stepscale = params['spacestep'] / 1e-6
     #plt.plot(points[simplex, 0]*stepscale - sizer, -points[simplex, 1]*stepscale + sizer, 'k-')
 
 #screen_position = params['Nx'] / 10 + 10
+
+for i in range(points.shape[0]):
+    if points[i,1]*stepscale - sizer > -3.5:
+        plt.scatter(-points[i,0]*stepscale + sizer, points[i,1]*stepscale - sizer, color='k', s=2)
+   
+lims = 1.5
+plt.xlim((-lims,lims))
+plt.ylim((-lims,lims))
 
 
 def animate(t):
