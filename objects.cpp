@@ -19,7 +19,7 @@ void lense_col(double ep[], int Nx, int Ny, int center_x, int center_y, int radi
             }
             else
             {
-                ep[index(i,j,Nx)] = 4.7;
+                ep[index(i,j,Nx)] = 1;
             }
         }
     }  
@@ -46,7 +46,7 @@ void lense_foc(double ep[], int Nx, int Ny, int center_x, int center_y, int radi
             }
             else
             {
-                ep[index(i,j,Nx)] = 4.7;
+                ep[index(i,j,Nx)] = 1;
             }
         }
     }  
