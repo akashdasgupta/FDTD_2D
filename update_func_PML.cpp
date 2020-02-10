@@ -25,7 +25,6 @@ void update_H_pml(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double 
     double new_Hx{};
     double new_Hy{};
 
-// #pragma omp parallel for 
     for (int i=0; i<Ny; ++i)
     {    
         for (int j=0; j<Nx-1; ++j)
@@ -94,7 +93,6 @@ void update_E_pml(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, in
     double new_Dz{};
     double c{299792458};
 
-// #pragma omp parallel for 
     for (int i=0; i<Ny; ++i)
     {
         {
@@ -153,7 +151,6 @@ void update_H_bulk(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double
     double new_Hx{};
     double new_Hy{};   
 
-// #pragma omp parallel for 
     for (int i=0; i<Ny; ++i)
     {
         // left PML
@@ -195,7 +192,6 @@ void update_H_bulk(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double
             
         }
 
-        //Right PML
         for (int j=Nx-pml_size; j<Nx-1; ++j)
         {
             CEx = (Ez[index(i+2,j,Nx)] - Ez[index(i+1,j,Nx)]) / dy;
