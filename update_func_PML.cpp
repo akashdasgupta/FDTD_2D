@@ -152,10 +152,13 @@ void update_H_bulk(double Ez[], double Hx[], double Hy[], int Nx, int Ny, double
     
     double new_Hx{};
     double new_Hy{};   
-
+    
+    // Crazy PML coficients will only be applied to edge parts
+    // no need to apply the coficients everywhere and use up loads of compute
+    // hence the 3 for loops
     for (int i=0; i<Ny; ++i)
     {
-        // left PML
+        // left PML: Just going 
         for (int j=0; j<pml_size; ++j)
         {
             CEx = (Ez[index(i+2,j,Nx)] - Ez[index(i+1,j,Nx)]) / dy;
@@ -265,7 +268,9 @@ void update_E_bulk(double Ez[], double Dz[], double Hx[], double Hy[], int Nx, i
     double new_Dz{};
     double c{299792458};
     
-// #pragma omp parallel for 
+    // Crazy PML coficients will only be applied to edge parts
+    // no need to apply the coficients everywhere and use up loads of compute
+    // hence the 3 for loops
     for (int i=0; i<Ny; ++i)
     {
         // Left most edge, mirrior like:
