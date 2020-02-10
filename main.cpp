@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 ////////////////////////////////////////////////////////////////////////////  
     
     //INITIAL PARAMS:                                                     
-    double gridsize        {1e-6}; // Just gonna use square grids 
+    double gridsize        {10e-6}; // Just gonna use square grids 
     double time            {100e-15};
     double lambda_min      {200e-9}; // chang as approriate, funcs here use 200nm                                           
     double pml_size_ratio  {10};                                            
@@ -47,13 +47,13 @@ int main(int argc, char *argv[])
     double object_position[2]  {gridsize/2,gridsize/2}; // {x,y}
     
     // for lens:
-    double rad_of_curvature   {0.6e-6};
-    double lens_width         {0.5e-6};
+    double rad_of_curvature   {2e-6};
+    double lens_width         {1.5e-6};
     // for double slit:
     double slit_width         {10e-9};
-    double slit_seperation    {50e-9};
+    double slit_seperation    {500e-9};
     // for tunnelling:
-    double airgap_width       {50e-9};
+    double airgap_width       {80e-9};
 
 ////////////////////////////////////////////////////////////////////////////  
 
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
     double dx {lambda_min / 20}; // at least 10 points per half wavelength
     double dy {lambda_min / 20};
     double dt {dx / (2*c)}; // best dispersion to resolution
-    int iterations {500 };//time / dt};    
+    int iterations {time / dt};    
     int Nx{gridsize / dx};
     int Ny{gridsize / dy};
     int pml_size{Nx / pml_size_ratio};
@@ -110,7 +110,6 @@ int main(int argc, char *argv[])
         }
     }
     
-    
     // creates graded sigma profile for PML boundry:
     double * sigma_x = new double[pml_size];
     double *sigma_y = new double[pml_size];
@@ -127,7 +126,6 @@ int main(int argc, char *argv[])
     }
     num_frame[0] = 1; // 0th iteration is a bit useless
     
-   
     // Logic to figure out how to split grid between jobs: 
     double density_pml = static_cast<double>(pml_ratio) 
                             * static_cast<double>(size) 
