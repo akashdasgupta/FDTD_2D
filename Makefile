@@ -1,10 +1,10 @@
 CC = mpic++
 IDIR = include
 
-CFLAGS = -I $(IDIR) -O2 
+CFLAGS = -I $(IDIR) -O2
 
 SRC = $(wildcard *.cpp)
-NAME = a.out
+NAME = o2_sweep_exec2
 
 
 $(NAME): $(SRC)
