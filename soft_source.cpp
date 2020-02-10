@@ -1,7 +1,6 @@
 #include <soft_source.h>
 #include <math.h>  
 # include <cmath>
-#include <iostream>
 
 /*
  * Creates a gausian pulse pertubation in the electric field
