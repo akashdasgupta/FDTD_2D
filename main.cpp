@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 ////////////////////////////////////////////////////////////////////////////  
     
     //INITIAL PARAMS:                                                     
-    double gridsize        {10e-6}; // Just gonna use square grids 
+    double gridsize        {3e-6}; // Just gonna use square grids 
     double time            {100e-15};
     double lambda_min      {200e-9}; // chang as approriate, funcs here use 200nm                                           
     double pml_size_ratio  {10};                                            
@@ -41,10 +41,10 @@ int main(int argc, char *argv[])
     int frames_to_save     {300};  
     
     
-    double source_position[2]  {gridsize/2,gridsize/4};// {x,y}
-    int objecttype             {4}; // 1=planar_convex_lens, 2=biconvel lens, 
+    double source_position[2]  {gridsize/2,320e-9};// {x,y}
+    int objecttype             {2}; // 1=planar_convex_lens, 2=biconvel lens, 
                                     // 3 = double_slit, 4= tunelling
-    double object_position[2]  {gridsize/2,gridsize/2}; // {x,y}
+    double object_position[2]  {gridsize/2,900e-9}; // {x,y}
     
     // for lens:
     double rad_of_curvature   {2e-6};
