@@ -2,7 +2,7 @@
 ### For submission in the Advanced Computing module
 
 ### Supervisor for project: 
-* Simom Hannah
+* Simon Hannah
 
 ### University of Bristol, 2019-2020
 
